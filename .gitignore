@@ -1,0 +1,21 @@
+# secrets: never commit these
+.streamlit/secrets.toml
+.streamlit/secrets.toml.example
+.env
+
+# local environment and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# editors and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# league data copies with private notes: the live app reads MongoDB, these are only for local preview / migration
+data/source/
+data/bo7_seed.json

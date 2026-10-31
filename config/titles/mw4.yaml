@@ -1,0 +1,64 @@
+# Modern Warfare 4 (2027 season) -- starting template.
+#
+# Starts from the Black Ops 7 rules. Opening map pool below; change it during the
+# season in the app (Scorekeeper > Season Settings).
+# Modes keep a Provisional tag and borrow Black Ops 7's MAR values until
+# they have 8 maps of their own.
+
+id: MW4
+name: Modern Warfare 4
+short: MW4
+year: 2027
+order: 2
+current: true
+calibrated: false
+borrow_from: BO7             # where uncalibrated MAR values come from
+provisional_maps: 8          # maps per mode before a mode's own values get half weight
+
+team_sizes: [3v3, 4v4]
+
+modes:
+  HP:
+    name: Hardpoint
+    short: Hardpoint
+    score_label: Points
+    win_score: 250
+    stats: [hill_time, objective_kills]
+    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
+    retired_maps: []
+  SND:
+    name: Search and Destroy
+    short: SnD
+    score_label: Rounds
+    win_score: 6
+    stats: [first_bloods, first_deaths, bombs_planted]
+    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
+    retired_maps: []
+  OVL:
+    name: Overload
+    short: Overload
+    score_label: Overloads
+    win_score: null
+    stats: [overloads, carrier_kills, kills_as_carrier, accuracy]
+    maps: []
+    retired_maps: []
+    active: false            # not in Modern Warfare 4
+  HJ:
+    name: Hijack
+    short: Hijack
+    score_label: Score
+    win_score: null
+    stats: []                # add Hijack's objective stat once the scoreboard is known
+    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
+    retired_maps: []
+    borrow_mode: OVL
+
+mar:
+  assist: 0.25
+  modes:
+    HP:  {hill_sec_per_kill: 2.5}
+    SND: {plant: 1.0, fb_margin: 0.5}
+    OVL: {overload: 3.0, carrier_kill: 1.5, kill_as_carrier: 1.0}
+    HJ:  {}
+  lobby_prior: {HP: 1.3333, SND: 1.0, OVL: 1.3333, HJ: 1.3333}
+  lobby_k: 10

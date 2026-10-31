@@ -1,0 +1,37 @@
+# Theme for the whole app (Mist palette, Hanken Grotesk). Streamlit reads this
+# file automatically, locally and on Streamlit Cloud.
+
+[theme]
+base = "light"
+primaryColor = "#124E66"
+backgroundColor = "#D3D9D4"
+secondaryBackgroundColor = "#E2E7E3"
+textColor = "#212A31"
+linkColor = "#124E66"
+redColor = "#A8543C"
+blueColor = "#124E66"
+font = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&display=swap"
+headingFont = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&display=swap"
+headingFontWeights = 300
+baseRadius = "2px"
+buttonRadius = "2px"
+borderColor = "#BCC5C1"
+showWidgetBorder = true
+showSidebarBorder = true
+dataframeBorderColor = "#BCC5C1"
+dataframeHeaderBackgroundColor = "#E2E7E3"
+
+[theme.sidebar]
+backgroundColor = "#E2E7E3"
+secondaryBackgroundColor = "#D3D9D4"
+
+[client]
+toolbarMode = "minimal"
+
+[server]
+headless = true
+enableStaticServing = true
+maxUploadSize = 10   # MB; scoreboard screenshots are about 0.5 MB
+
+[runner]
+magicEnabled = false   # never print stray values on the page

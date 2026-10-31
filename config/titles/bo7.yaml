@@ -1,0 +1,66 @@
+# Black Ops 7 (2026 season)
+#
+# One file per Call of Duty title. On first run (or when you run the
+# migration) this file seeds the title's settings in the database. After
+# that, settings are edited in the app (Scorekeeper > Season Settings) and
+# every change is dated, so older maps keep the rules they were played under.
+# For a brand-new title, copy the template file and adjust it.
+
+id: BO7
+name: Black Ops 7
+short: BO7
+year: 2026
+order: 1
+current: false
+calibrated: true            # MAR values below were fitted on this title's own maps
+
+team_sizes: [3v3, 4v4]
+
+modes:
+  HP:
+    name: Hardpoint
+    short: Hardpoint
+    score_label: Points
+    win_score: 250
+    stats: [hill_time, objective_kills]
+    maps: [Colossus, Den, Gridlock, Hacienda, Sake, Scar]
+    retired_maps: [Raid]
+  SND:
+    name: Search and Destroy
+    short: SnD
+    score_label: Rounds
+    win_score: 6
+    stats: [first_bloods, first_deaths, bombs_planted]
+    maps: [Den, Fringe, Gridlock, Hacienda, Raid, Sake]
+    retired_maps: [Plaza]
+  OVL:
+    name: Overload
+    short: Overload
+    score_label: Overloads
+    win_score: null
+    stats: [overloads, carrier_kills, kills_as_carrier, accuracy]
+    maps: [Den, Exposure, Gridlock, Scar]
+    retired_maps: []
+
+# MAR: what each stat is worth in kills, how many kill-equivalents (KE)
+# swing one map win, and the replacement level (20th-percentile KE).
+mar:
+  assist: 0.25
+  modes:
+    HP:  {hill_sec_per_kill: 2.5, kpw: 118.5, replacement: -15.34}
+    SND: {plant: 1.0, fb_margin: 0.5, kpw: 33.5, replacement: -4.63}
+    OVL: {overload: 3.0, carrier_kill: 1.5, kill_as_carrier: 1.0, kpw: 54.1, replacement: -11.54}
+  lobby_prior: {HP: 1.3333, SND: 1.0, OVL: 1.3333}   # 4v4 kills-per-win ratio before 4v4 data
+  lobby_k: 10                                        # 4v4 maps before own ratio gets half weight
+
+# Hand-written playstyle labels for this season (optional). Titles without
+# them get a label generated from the radar.
+archetypes:
+  Arath: [Franchise Player, "Top-two in kills, K/D, damage and MAR in every mode, and rarely has a bad night. Big games are routine."]
+  Carl: [Two-Way Star, "Best K/D in SnD and Overload, best win rate in the league, solid in Hardpoint. His team wins with him."]
+  Vera: [Spearhead, "Leads the push in every mode: most overloads and plants, and keeps fighting while carrying the device."]
+  Miguel: [Enforcer, "Shuts down the other team’s plays: most carrier kills among the regulars, and steps up on pressure maps."]
+  Jason: [Anchor, "Lives on the hill and makes it count: most hill time and best hill time per death in the league."]
+  Sal: [Objective Grinder, "Steady hill time and overloads, map after map, with few real off-nights."]
+  Ed: [Ace, "Takes over games: best numbers in the league when he plays, and MVP in 2 of his 3 series. Small sample."]
+  Fonz: [Developing, "Still building his game. Best at: kills while carrying the overload. Small sample."]
