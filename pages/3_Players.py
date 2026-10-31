@@ -40,10 +40,11 @@ if n < 10:
     ui.html(f"<p style='margin:8px 0 0; font-size:13px; color:{ui.MUTED}'>{ui.small_sample()} Only {n} maps played, so rates can swing a lot.</p>")
 SEC = ["Value", "Slaying"] + [{"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}.get(m, m)
                                for m in ["HP", "SND", "OVL", "HJ"] if m in set(pm["mode"])]
-ui.html(f"<style>.cb-jump a{{display:inline-flex; align-items:center; min-height:40px; padding:0 16px; border:1px solid {ui.RULE}; "
-        f"margin:0 -1px -1px 0; font-size:14px; color:{ui.INK} !important; text-decoration:none !important; background:transparent}}"
-        f".cb-jump a{{position:relative}} .cb-jump a:hover{{background:{ui.PANEL}; border-color:{ui.STEEL}; z-index:1}}html{{scroll-behavior:smooth}}</style>"
-        "<nav aria-label='Sections' class='cb-jump' style='display:flex; flex-wrap:wrap; margin-top:12px'>"
+# jump links: the same boxed buttons as the Glossary's
+ui.html(f"<style>.cb-jump a{{display:inline-flex; align-items:center; min-height:40px; padding:0 14px; border:1px solid {ui.RULE}; border-radius:2px; "
+        f"box-sizing:border-box; font-size:14px; color:{ui.INK} !important; text-decoration:none !important; background:transparent}}"
+        f".cb-jump a:hover{{background:{ui.PANEL}; border-color:{ui.INK}}}html{{scroll-behavior:smooth}}</style>"
+        "<nav aria-label='Sections' class='cb-jump' style='display:flex; flex-wrap:wrap; gap:8px; margin-top:12px'>"
         + "".join(f"<a href='#{s.lower().replace(' ', '-')}' target='_self'>{s}</a>" for s in SEC) + "</nav>")
 
 

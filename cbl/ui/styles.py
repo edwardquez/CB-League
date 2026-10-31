@@ -52,8 +52,11 @@ h1, h2, h3 {{ font-family: {FONT} !important; color: {INK}; }}
 .cb th, .cb td {{ border: none !important; }}
 .cb a {{ color: {BLUE}; text-underline-offset: 3px; }}
 div[data-testid="stSegmentedControl"] button, div[data-testid="stButton"] button {{ font-family: {FONT}; }}
-/* segmented controls: filled ink when picked (as in the mockups) */
-button[data-variant="segmented_control"] {{ background: transparent; border-color: {STEEL}; color: {INK}; min-height: 38px; }}
+/* every boxed control shares one look: thin light border, darker border on hover. Segmented controls fill ink when picked. */
+button[data-variant="segmented_control"] {{ background: transparent; border-color: {RULE}; color: {INK}; min-height: 38px; }}
+button[data-variant="segmented_control"][aria-checked="false"]:hover {{ border-color: {INK}; background: {PANEL}; z-index: 1; }}
+button[data-variant="pills"] {{ border-radius: 2px !important; }}
+button[data-variant="pills"][aria-checked="false"]:hover {{ border-color: {INK}; }}
 button[data-variant="segmented_control"][aria-checked="true"] {{ background: {INK} !important; border-color: {INK} !important; color: {BG} !important; }}
 button[data-variant="segmented_control"][aria-checked="true"] p {{ color: {BG} !important; font-weight: 600; }}
 /* underlined tabs: segmented controls placed with ui.tabs() */

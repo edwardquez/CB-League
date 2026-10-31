@@ -319,7 +319,8 @@ def bracket_section(tour, ms, title, note=""):
         for ri, r in enumerate(rounds):
             with cols[ri]:
                 lab = by[r][0]["label"]
-                ui.html(f"<div class='tn-roundlab' style='font-size:11px; color:{ui.MUTED}; height:22px; padding-top:10px'>{escape(lab)}</div>")
+                ui.html(f"<div class='tn-roundlab' style='font-size:11px; line-height:16px; color:{ui.MUTED}; height:32px; box-sizing:border-box; "
+                        f"padding:10px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{escape(lab)}</div>")
                 bottom = 0
                 for m in by[r]:
                     top = y[m["id"]] - CARD_H / 2

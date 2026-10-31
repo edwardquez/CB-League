@@ -12,11 +12,13 @@ cfg = ts.get(season, {})
 MODEN = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}
 
 ui.html(ui.note("What every stat on the site means and how it's calculated. The season picker changes the modes and MAR values shown, since each game has its own.", 0, 15))
-jumps = [("mar", "MAR"), ("core", "Core stats"), ("hp", "Hardpoint"), ("snd", "Search and Destroy"), ("ovl", "Overload"),
-         ("radar", "Playstyle radar"), ("proj", "Projections"), ("ocr", "Screenshot entry"), ("other", "Other terms")]
-ui.html(f"<style>.cb-gjump a{{color:{ui.MUTED} !important; text-decoration:none !important; min-height:40px; display:inline-flex; align-items:center}}"
-        f".cb-gjump a:hover{{color:{ui.INK} !important}}html{{scroll-behavior:smooth}}</style>"
-        f"<nav class='cb-gjump' style='display:flex; flex-wrap:wrap; gap:0 22px; margin-top:18px; font-size:14px; border-bottom:1px solid {ui.RULE}'>"
+jumps = [("mar", "MAR"), ("core", "Core Stats"), ("hp", "Hardpoint"), ("snd", "Search and Destroy"), ("ovl", "Overload"),
+         ("radar", "Playstyle Radar"), ("proj", "Projections"), ("ocr", "Screenshot Entry"), ("other", "Other Terms")]
+# jump links styled as the site's boxed buttons
+ui.html(f"<style>.cb-gjump a{{color:{ui.INK} !important; text-decoration:none !important; min-height:40px; display:inline-flex; align-items:center; "
+        f"padding:0 14px; border:1px solid {ui.RULE}; border-radius:2px; background:transparent; box-sizing:border-box}}"
+        f".cb-gjump a:hover{{border-color:{ui.INK}; background:{ui.PANEL}}}html{{scroll-behavior:smooth}}</style>"
+        f"<nav class='cb-gjump' style='display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; font-size:14px'>"
         + "".join(f"<a href='#{i}' target='_self'>{l}</a>" for i, l in jumps) + "</nav>")
 
 
@@ -123,7 +125,7 @@ ui.html(html + "</section>")
 # ------------------------------------------------------------------ terms
 T = lambda term, abbr, means, how="": (term, abbr, means, how)  # noqa: E731
 groups = [
-    ("core", "Core stats", [
+    ("core", "Core Stats", [
         T("K/D", "Kill/death ratio", "Kills divided by deaths.", "Always total kills over total deaths, never an average of each map’s K/D, so one huge map can’t skew it."),
         T("+/-", "Plus/minus", "Kills minus deaths.", "Positive means you got more kills than you gave up."),
         T("Non-traded kills", "NTK", "Kills the other team didn’t answer by immediately killing you back.", "Counted inside kills, so it isn’t added to MAR separately."),
@@ -159,7 +161,7 @@ groups = [
         T("Overloads", "OVL", "Scored by carrying the device into the enemy goal.", "In MAR, each overload is worth three kills."),
         T("Carrier kills", "CK", "Kills on the enemy carrier, stopping a possible score.", "In MAR, each is worth an extra 1.5 kills on top of the kill itself."),
         T("Kills as carrier", "KAC", "Kills while carrying the device.", "In MAR (Playmaking), each is worth an extra kill.")]),
-    ("radar", "Playstyle radar", [
+    ("radar", "Playstyle Radar", [
         T("Slaying", "Spoke", "Kills, K/D and damage per map combined."),
         T("Objective", "Spoke", "Hill time (counts double) and overloads. Carrier kills count toward Defense instead."),
         T("Playmaking", "Spoke", "Plays that create an advantage: first bloods, plants and kills while carrying the overload."),
@@ -180,7 +182,7 @@ groups = [
         T("Confidence", "Low · Medium · High", "How many maps the player has in this mode: Low under 5, Medium 5 to 9, High 10 or more.",
           "Mode history drives most of every projection, so it sets the label rather than games on one map."),
         T("Track record", "", "Second-half maps re-projected using only earlier games, then compared with what actually happened.")]),
-    ("ocr", "Screenshot entry", [
+    ("ocr", "Screenshot Entry", [
         T("Fill From Screenshot", "Scorekeeper", "Fills in a whole map from a picture of the Codcaster scoreboard: mode, map, score, game time and every player's stats.",
           "Works for Hardpoint and Search and Destroy, 3v3 and 4v4, in Modern Warfare 4 and Black Ops 7. Hijack follows once its scoreboard is available."),
         T("OCR", "Optical character recognition", "Software that reads text from a picture. The site uses Tesseract, a free, open-source OCR engine that runs on "
@@ -206,7 +208,7 @@ groups = [
                                             "Highest Streak, and flagged before anything is filled in."),
         T("What's saved", "", "Only the numbers, after a person checks the review and presses Save, the same as typing them in. The screenshot itself "
                               "is never stored.")]),
-    ("other", "Other terms", [
+    ("other", "Other Terms", [
         T("Series MVP", "Top MAR", "The player with the highest MAR in a series."),
         T("Fill-in / replacement", "", "A bad-but-playable game: the 20th-percentile performance in that mode. MAR measures everyone against it."),
         T("Small sample", "Tag", "Shown when a number is built on few maps (under 10 overall, under 5 in one mode), so it can swing a lot."),
