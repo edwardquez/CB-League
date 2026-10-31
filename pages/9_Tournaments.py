@@ -91,7 +91,8 @@ def unlock_box(why: str = "enter results"):
     """Password form (shared with the Scorekeeper) plus the practice-mode way in."""
     with st.container(border=True):
         ui.html(f"<div style='font-size:16px; font-weight:600'>Unlock to {why}</div>"
-                + ui.note("Uses the Scorekeeper password. Just testing? Practice mode works on a private copy, so nothing is saved.", 4, 13))
+                + ui.note("Uses the Scorekeeper password. Just testing? Practice mode works on a private copy, so nothing is saved.", 4, 13)
+                + "<div style='height:12px'></div>")
         if PW is not None:
             with st.form(f"tn_login_{why.replace(' ', '_')}"):
                 got = st.text_input("Password", type="password")
@@ -207,6 +208,8 @@ ui.html("<div style='height:18px'></div>")
 # ===================================================================== helpers for one tournament
 class Tour:
     def __init__(self, doc):
+        for m in doc["matches"]:  # older tournaments were saved with lower-case labels
+            m["label"] = T.title_label(m["label"])
         self.t = doc
         self.maps = tmaps(doc["_id"])
         self.kd = team_kd(doc["_id"])
@@ -224,9 +227,9 @@ class Tour:
         if "seed" in src:
             return f"Seed {src['seed']}"
         if "win" in src:
-            return f"Winner of {self.ms[src['win']]['label'].lower()}"
+            return f"Winner of {self.ms[src['win']]['label']}"
         if "lose" in src:
-            return f"Loser of {self.ms[src['lose']]['label'].lower()}"
+            return f"Loser of {self.ms[src['lose']]['label']}"
         if "rank" in src:
             stage = "the regular season" if self.t["format"] == "rrp" else "the Swiss rounds"
             return f"#{src['rank']} after {stage}"
@@ -270,9 +273,9 @@ def card_html(tour, m, sel, h=CARD_H, extra=""):
                     f"<span title='{escape(nm)}' style='font-size:{fs}px; font-weight:{600 if won else 400}; color:{fg}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{escape(nm)}</span>"
                     f"<span style='text-align:right; font-size:15px; font-weight:{600 if won else 400}; color:{fg}'>{sc}</span></div>")
     foot_l = {"live": f"LIVE · map {r['wa'] + r['wb'] + 1} next", "done": "Final" + (" · winner only" if r["manual"] else ""), "ready": "Ready",
-              "waiting": "Waiting", "bye": "Bye", "skipped": "Not needed"}[st_]
+              "waiting": "Waiting", "bye": "Bye", "skipped": "Not Needed"}[st_]
     if m.get("if_needed") and st_ in ("waiting", "ready"):
-        foot_l = "If needed"
+        foot_l = "If Needed"
     dashed = m.get("if_needed") or st_ in ("bye", "skipped")
     edge = ui.BLUE if live else ui.RULE
     ring = f"outline:2px solid {ui.INK}; outline-offset:2px;" if sel else ""
@@ -337,7 +340,7 @@ def bracket_section(tour, ms, title, note=""):
 def finals_column(tour, ms):
     for m in ms:
         r = tour.R[m["id"]]
-        ui.html(f"<div style='font-size:11px; color:{ui.MUTED}; margin:14px 0 4px'>{escape(m['label'])}{' · if needed' if m.get('if_needed') else ''}</div>")
+        ui.html(f"<div style='font-size:11px; color:{ui.MUTED}; margin:14px 0 4px'>{escape(m['label'])}{' · If Needed' if m.get('if_needed') else ''}</div>")
         card(tour, m)
 
 
@@ -541,9 +544,10 @@ def match_panel(tour):
                 f"<span style='text-align:right; font-size:17px; color:{tour.color.get(r['a'], ui.INK)}; font-weight:{600 if st_ == 'done' and r['winner'] == r['a'] else 500}'>{escape(A)}</span>"
                 f"{score}"
                 f"<span style='font-size:17px; color:{tour.color.get(r['b'], ui.INK)}; font-weight:{600 if st_ == 'done' and r['winner'] == r['b'] else 500}'>{escape(B)}</span></div>")
-        for x in r["maps"]:
+        lock0 = T.locked(t, tour.R, m["id"])
+        for xi, x in enumerate(r["maps"]):
             won = A if x["winner"] == "A" else B
-            c1, c2 = st.columns([5, 1], vertical_alignment="center")
+            c1, c2, c3 = st.columns([5, 1, 1], vertical_alignment="center")
             with c1:
                 ui.html(f"<div style='display:grid; grid-template-columns:64px minmax(0,1fr) auto; align-items:center; gap:14px; padding:8px 0; border-top:1px solid {ui.RULE}'>"
                         f"<div>{ui.img_tag(x['map'])}</div><div><div style='font-size:14px; font-weight:500'>Map {x['map_no']} · {SHORT.get(x['mode'], x['mode'])} on {escape(x['map'])}</div>"
@@ -554,22 +558,39 @@ def match_panel(tour):
                     prows = [p for p in tpms(tid) if p["map_id"] == x["_id"]]
                     ss.tn_entry = {"tid": tid, "mid": m["id"], "draft": me.new_draft(ts[t["title"]], x, prows)}
                     ss.tn_view = "entry"; st.rerun()
+            with c3:
+                if CAN_EDIT and xi == len(r["maps"]) - 1 and not lock0 and st.button("Delete", key=f"tn_delm_{x['_id']}", width="stretch"):
+                    ss.tn_confirm_delm = x["_id"]
+            if ss.get("tn_confirm_delm") == x["_id"]:
+                st.warning(f"Delete map {x['map_no']} ({x['map']})? Its player stats go too.")
+                d1, d2 = st.columns(2)
+                if d1.button("Yes, Delete", type="primary", key="tn_delm_yes"):
+                    data.delete_tmap(x["_id"]); ss.pop("tn_confirm_delm", None)
+                    if T.redraw_after(t, tour.R, m["id"]):
+                        data.save_tournament(t)
+                    st.rerun()
+                if d2.button("Keep It", key="tn_delm_no"):
+                    ss.pop("tn_confirm_delm", None); st.rerun()
         if r["manual"]:
             ui.html(ui.note(f"Winner recorded without stats: {escape(tour.name(r['winner']))}.", 8, 13))
+        if not r["manual"] and (max(r["wa"], r["wb"]) > need or min(r["wa"], r["wb"]) >= need):
+            ui.html(f"<div style='margin-top:10px; padding:10px 12px; border-left:3px solid {ui.RUST}; background:{ui.LIGHT}; font-size:13px'>"
+                    f"<b style='font-weight:600'>Check the results:</b> {r['wa']}–{r['wb']} is more maps than a Bo{m['bo']} needs (first to {need}). "
+                    "This can happen after editing a map. Edit or delete the extra map so the score is right.</div>")
         lock = T.locked(t, tour.R, m["id"])
         nxt = [d for d in T.dependents(t, m["id"]) if tour.R[d]["status"] != "skipped" and any(s.get("win") == m["id"] for s in (tour.ms[d]["a"], tour.ms[d]["b"]))]
         if st_ == "live":
             lead = "first to " + str(need) + " maps"
-            ui.html(ui.note(f"Bo{m['bo']}: {lead}." + (f" The winner goes to the {tour.ms[nxt[0]]['label'].lower()}." if nxt else ""), 10, 13)
+            ui.html(ui.note(f"Bo{m['bo']}: {lead}." + (f" The winner goes to the {tour.ms[nxt[0]]['label']}." if nxt else ""), 10, 13)
                     + "<div style='height:8px'></div>")
         elif st_ == "done":
             wa, wb = (r["wa"], r["wb"]) if r["winner"] == r["a"] else (r["wb"], r["wa"])
             line = f"{escape(tour.name(r['winner']))} won" + ("" if r["manual"] else f" {wa}–{wb}") + "."
             if nxt:
-                line += f" They go on to the {escape(tour.ms[nxt[0]]['label'].lower())}."
+                line += f" They go on to the {escape(tour.ms[nxt[0]]['label'])}."
             ui.html(ui.note(line, 10, 13))
         elif st_ == "waiting":
-            ui.html(ui.note("Waiting on " + " and ".join(escape(tour.src_text(s)).lower() for s, sd in ((m["a"], "a"), (m["b"], "b")) if r[sd] is None) + ".", 10, 13))
+            ui.html(ui.note("Waiting on " + " and ".join(escape(tour.src_text(s)[:1].lower() + tour.src_text(s)[1:]) for s, sd in ((m["a"], "a"), (m["b"], "b")) if r[sd] is None) + ".", 10, 13))
         elif st_ == "ready":
             ui.html(ui.note(f"Ready to play. Bo{m['bo']}: first to {need} maps.", 10, 13) + "<div style='height:8px'></div>")
         if st_ in ("ready", "live"):
@@ -593,10 +614,10 @@ def match_panel(tour):
         if st_ in ("done", "live") and CAN_EDIT:
             if lock:
                 ui.html(ui.note("Locked: a match that depends on this result has already started. Undo that one first.", 10, 12))
-            elif st.button("Undo Result" if st_ == "done" else "Clear This Series", type="tertiary", key="tn_undo"):
+            elif st.button("Undo Result" if st_ == "done" else "Clear This Series", key="tn_undo"):
                 ss.tn_confirm_undo = m["id"]
             if ss.get("tn_confirm_undo") == m["id"]:
-                st.warning(f"Clear {m['label'].lower()}? Its maps and player stats are deleted and the bracket goes back to before it was played.")
+                st.warning(f"Clear {m['label']}? Its maps and player stats are deleted and the bracket goes back to before it was played.")
                 a, b = st.columns(2)
                 if a.button("Yes, Clear It", type="primary", key="tn_undo_yes"):
                     # a Swiss round drawn from this result goes too
@@ -647,7 +668,7 @@ def bracket_tab(tour):
                 if up:  # the series is decided: show the next one to play
                     ss[f"tn_sel_{t['_id']}"] = up[0]
                 nxt = [d for d in T.dependents(t, m["id"]) if tour.R[d]["status"] != "skipped" and any(s.get("win") == m["id"] for s in (tour.ms[d]["a"], tour.ms[d]["b"]))]
-                msg = f"Map saved. {tour.name(r['winner'])} win the {m['label'].lower()}" + (f" and move on to the {tour.ms[nxt[0]]['label'].lower()}." if nxt else ".")
+                msg = f"Map saved. {tour.name(r['winner'])} win the {m['label']}" + (f" and move on to the {tour.ms[nxt[0]]['label']}." if nxt else ".")
             ui.html(f"<div style='margin-top:18px; padding:12px 16px; background:{ui.BLUE}; color:{ui.LIGHT}; font-size:14px'>{escape(msg)}</div>")
     blurb = {"se": "Single elimination: lose once and you're out.",
              "de": "Double elimination: lose twice and you're out. A team that drops from the winners bracket gets a second life in the losers bracket.",
@@ -747,7 +768,7 @@ def series_board(tour, m, r):
                          {"v": f"{kd:.2f}", "bg": bg, "fg": fg, "w": 500}, "—" if a["assists"] is None else str(a["assists"]), ui.n0(a["damage"])]
                         + ["—" if a[f] is None else (ui.mmss(a[f]) if f == "hill_time" else str(a[f])) for f, _ in extra])
     cols = [("Player", "left"), ("Maps", "right"), ("K", "right"), ("D", "right"), ("K/D", "right"), ("A", "right"), ("Dmg", "right")] + [(lab, "right") for _, lab in extra]
-    ui.html(f"<div style='font-size:14px; margin-top:6px'>Series totals · {len(r['maps'])} maps · "
+    ui.html(f"<div style='font-size:14px; margin-top:6px'>Series totals · {len(r['maps'])} map{'s' if len(r['maps']) != 1 else ''} · "
             f"{escape(tour.name(r['a']))} {ws[0]}–{ws[1]} {escape(tour.name(r['b']))}</div>"
             + ui.table(cols, body, min_width=560, cell_pad="9px 6px")
             + f"<div style='display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:10px; font-size:12px; color:{ui.MUTED}'>"
@@ -763,9 +784,9 @@ def matches_tab(tour):
         rows = ""
         for m in todo:
             r = R[m["id"]]
-            note = {"live": f"Live · {r['wa']}–{r['wb']}", "ready": "Ready to start", "waiting": "Waiting"}[r["status"]]
+            note = {"live": f"Live · {r['wa']}–{r['wb']}", "ready": "Ready to Start", "waiting": "Waiting"}[r["status"]]
             if m.get("if_needed"):
-                note = "If needed"
+                note = "If Needed"
             a_ = tour.name(r["a"]) if r["a"] else "TBD"
             b_ = tour.name(r["b"]) if r["b"] else "TBD"
             rows += (f"<div class='cb-uprow' style='display:grid; grid-template-columns:200px minmax(0, 1fr) 120px; gap:4px 16px; align-items:center; "
@@ -788,9 +809,9 @@ def matches_tab(tour):
             ui.html(f"<div style='padding:14px 0 6px'><div style='font-size:13px; color:{ui.MUTED}'><b style='font-weight:600; color:{ui.INK}'>{escape(m['label'])}</b>"
                     f" · {fmt_date(t.get('date'))} · Bo{m['bo']}</div>"
                     "<div style='display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px 18px; margin-top:10px'>"
-                    f"<span style='text-align:right; font-size:16px; font-weight:{600 if aw else 400}; color:{ui.INK if aw else ui.MUTED}'>{escape(tour.name(r['a']))}</span>"
-                    f"<span style='font-weight:300; font-size:28px; line-height:1'>{sc}</span>"
-                    f"<span style='font-size:16px; font-weight:{400 if aw else 600}; color:{ui.MUTED if aw else ui.INK}'>{escape(tour.name(r['b']))}</span></div></div>")
+                    f"<span style='text-align:right; font-size:16px; font-weight:{600 if aw else 400}; color:{tour.color.get(r['a'], ui.INK)}'>{escape(tour.name(r['a']))}</span>"
+                    f"<span style='font-weight:300; font-size:28px; line-height:1; color:{ui.INK}'>{sc}</span>"
+                    f"<span style='font-size:16px; font-weight:{400 if aw else 600}; color:{tour.color.get(r['b'], ui.INK)}'>{escape(tour.name(r['b']))}</span></div></div>")
         with c2:
             if r["maps"] and st.button("Hide Recap" if open_ else "Recap", key=f"tn_rc_{m['id']}", type="primary" if open_ else "secondary", width="stretch"):
                 ss[key] = None if open_ else m["id"]; st.rerun()
@@ -949,7 +970,11 @@ def entry_view():
     doc = next((x for x in TOURS if x["_id"] == (E or {}).get("tid")), None)
     if not E or not doc or not CAN_EDIT:
         ss.tn_view = "main"; st.rerun()
-    tour = Tour(doc); m = tour.ms[E["mid"]]; r = tour.R[m["id"]]
+    tour = Tour(doc)
+    if E["mid"] not in tour.ms or tour.R[E["mid"]]["a"] in (None, T.BYE) or tour.R[E["mid"]]["b"] in (None, T.BYE):
+        # the match changed under us (e.g. undone on another phone): back to the bracket
+        ss.pop("tn_entry", None); ss.tn_view = "main"; st.rerun()
+    m = tour.ms[E["mid"]]; r = tour.R[m["id"]]
     A, B = tour.teams[r["a"]], tour.teams[r["b"]]
     D = E["draft"]
     nsaved = len(r["maps"])
@@ -961,6 +986,8 @@ def entry_view():
     def on_save(mode, map_name, sa, sb, ln, board, rows, match_id):
         data.save_tmap(doc, m["id"], r["a"], r["b"], mode, map_name, sa, sb, ln, board, rows, map_id=match_id)
         fresh = data.load_tdocs()
+        if match_id and T.redraw_after(doc, T.resolve(doc, [x for x in fresh["t_matches"] if x["tournament_id"] == doc["_id"]]), m["id"]):
+            data.save_tournament(doc)  # an edited Swiss result: later rounds not yet played get drawn again
         if T.advance(doc, [x for x in fresh["t_matches"] if x["tournament_id"] == doc["_id"]]):
             data.save_tournament(doc)
         ss.tn_flash = {"tid": doc["_id"], "mid": m["id"]}

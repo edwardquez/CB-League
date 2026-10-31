@@ -58,6 +58,12 @@ def seed_order(p: int) -> list[int]:
     return order
 
 
+def title_label(label: str) -> str:
+    """Bracket labels in title case ("Winners Round 1"), also for tournaments made before labels were capitalized."""
+    small = {"of", "the", "a", "vs"}
+    return " ".join(w if (i and w in small) else w[:1].upper() + w[1:] for i, w in enumerate((label or "").split(" ")))
+
+
 def _round_name(r: int, rounds: int) -> str:
     left = rounds - r
     return {0: "Final", 1: "Semifinal", 2: "Quarterfinal"}.get(left, f"Round {r}")
@@ -87,7 +93,7 @@ def elim(prefix: str, entrants: list[dict], double: bool, bo: int, bo_l: int, bo
                 sa = {"win": wb[r - 1][2 * i]}; sb = {"win": wb[r - 1][2 * i + 1]}
             final = r == kr and not double
             if double:
-                nm = "Winners final" if r == kr else f"Winners round {r}"
+                nm = "Winners Final" if r == kr else f"Winners Round {r}"
             else:
                 nm = _round_name(r, kr)
             out.append({"id": mid, "stage": prefix + "W", "round": r, "label": (label + nm).strip(), "bo": bo_final if final else bo, "a": sa, "b": sb})
@@ -96,7 +102,7 @@ def elim(prefix: str, entrants: list[dict], double: bool, bo: int, bo_l: int, bo
     if not double:
         if third and kr >= 2:
             s1, s2 = wb[kr - 1]
-            out.append({"id": f"{prefix}3P", "stage": prefix + "3P", "round": kr, "label": (label + "Third-place match").strip(), "bo": bo,
+            out.append({"id": f"{prefix}3P", "stage": prefix + "3P", "round": kr, "label": (label + "Third-Place Match").strip(), "bo": bo,
                         "a": {"lose": s1}, "b": {"lose": s2}})
         return out
     # losers bracket
@@ -131,11 +137,11 @@ def elim(prefix: str, entrants: list[dict], double: bool, bo: int, bo_l: int, bo
         lb_winner = {"lose": wb[1][0]}
     for m in out:
         if m["stage"] == prefix + "L":
-            m["label"] = (label + ("Losers final" if m["round"] == lr else f"Losers round {m['round']}")).strip()
-    out.append({"id": f"{prefix}GF", "stage": prefix + "GF", "round": 1, "label": (label + "Grand final").strip(), "bo": bo_final,
+            m["label"] = (label + ("Losers Final" if m["round"] == lr else f"Losers Round {m['round']}")).strip()
+    out.append({"id": f"{prefix}GF", "stage": prefix + "GF", "round": 1, "label": (label + "Grand Final").strip(), "bo": bo_final,
                 "a": {"win": wb[kr][0]}, "b": lb_winner})
     if reset:
-        out.append({"id": f"{prefix}GR", "stage": prefix + "GR", "round": 1, "label": (label + "Bracket reset").strip(), "bo": bo_final,
+        out.append({"id": f"{prefix}GR", "stage": prefix + "GR", "round": 1, "label": (label + "Bracket Reset").strip(), "bo": bo_final,
                     "a": {"win": f"{prefix}GF"}, "b": {"lose": f"{prefix}GF"}, "if_needed": f"{prefix}GF"})
     return out
 
@@ -164,6 +170,21 @@ def round_robin(team_ids: list[str], legs: int, bo: int) -> list[dict]:
     return out
 
 
+def _pair(ids: list, played: set):
+    """Pair ids in order (best first) with no rematches; None if that's impossible."""
+    if not ids:
+        return []
+    a = ids[0]
+    for j in range(1, len(ids)):
+        b = ids[j]
+        if frozenset((a, b)) in played:
+            continue
+        rest = _pair(ids[1:j] + ids[j + 1:], played)
+        if rest is not None:
+            return [(a, b)] + rest
+    return None
+
+
 def swiss_round(t: dict, r: int, standings_rows: list[dict] | None, played: set) -> list[dict]:
     """Pairings for Swiss round r. Round 1 goes by seed (top half vs bottom half)."""
     bo = t["lengths"]["pools"]
@@ -173,23 +194,31 @@ def swiss_round(t: dict, r: int, standings_rows: list[dict] | None, played: set)
         ids = [x["team"] for x in standings_rows]
     out = []
     bye = None
-    if len(ids) % 2:
-        had = {m["a"].get("team") for m in t["matches"] if m["stage"] == "SW" and m["b"].get("bye")}
-        for tid in reversed(ids):
-            if tid not in had:
-                bye = tid
-                break
-        bye = bye or ids[-1]
-        ids = [x for x in ids if x != bye]
+    had = {m["a"].get("team") for m in t["matches"] if m["stage"] == "SW" and m["b"].get("bye")}
+    # the bye goes to the lowest-ranked team that hasn't had one yet
+    bye_order = ([x for x in reversed(ids) if x not in had] + [x for x in reversed(ids) if x in had]) if len(ids) % 2 else [None]
     if r == 1:
-        h = len(ids) // 2
-        pairs = list(zip(ids[:h], ids[h:]))
+        bye = bye_order[0]
+        rest = [x for x in ids if x != bye]
+        h = len(rest) // 2
+        pairs = list(zip(rest[:h], rest[h:]))
     else:
-        pairs, left = [], ids[:]
-        while left:
-            a = left.pop(0)
-            j = next((i for i, b in enumerate(left) if frozenset((a, b)) not in played), 0)
-            pairs.append((a, left.pop(j)))
+        # teams on the same record meet, top down, with no rematches whenever any pairing allows it
+        pairs = None
+        for cand in bye_order:
+            rest = [x for x in ids if x != cand]
+            pairs = _pair(rest, played)
+            if pairs is not None:
+                bye = cand
+                break
+        if pairs is None:  # every pairing needs a rematch: fall back to the fewest, top down
+            bye = bye_order[0]
+            left = [x for x in ids if x != bye]
+            pairs = []
+            while left:
+                a = left.pop(0)
+                j = next((i for i, b in enumerate(left) if frozenset((a, b)) not in played), 0)
+                pairs.append((a, left.pop(j)))
     for g, (a, b) in enumerate(pairs, 1):
         out.append({"id": f"SW{r}-{g}", "stage": "SW", "round": r, "label": f"Round {r}", "bo": bo, "a": {"team": a}, "b": {"team": b}})
     if bye:
@@ -392,6 +421,20 @@ def advance(t: dict, t_maps: list[dict], kd: dict | None = None) -> bool:
     return True
 
 
+def redraw_after(t: dict, R: dict, mid: str) -> bool:
+    """Swiss: a result changed in an earlier round, so drop later rounds nobody has played yet
+    (advance() draws them again from the new standings). Returns True if the doc changed."""
+    m0 = next((m for m in t["matches"] if m["id"] == mid), None)
+    if not m0 or m0["stage"] != "SW":
+        return False
+    later = [m for m in t["matches"] if m["stage"] == "SW" and m["round"] > m0["round"]]
+    if not later or any(R.get(m["id"], {}).get("maps") or R.get(m["id"], {}).get("manual") for m in later):
+        return False
+    ids = {m["id"] for m in later}
+    t["matches"] = [m for m in t["matches"] if m["id"] not in ids]
+    return True
+
+
 def dependents(t: dict, mid: str) -> list[str]:
     """Matches whose teams depend on this one's result."""
     out = []
@@ -459,6 +502,10 @@ def placements(t: dict, R: dict, t_maps: list[dict], kd: dict | None = None) -> 
         for x in standings(t, R, t_maps, kd):
             if x["team"] not in inn:
                 out[x["team"]] = "Out · " + ("Regular season" if fmt == "rrp" else "Swiss rounds")
+    for m in elim_ms:  # third-place match
+        r = R[m["id"]]
+        if m["stage"].endswith("3P") and r["status"] == "done":
+            out[r["winner"]] = "3rd"; out[r["loser"]] = "4th"
     if champ:
         out[champ] = "Champions"
         last = [m for m in elim_ms if not m["stage"].endswith("3P")]
