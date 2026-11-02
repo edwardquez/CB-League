@@ -21,6 +21,8 @@ ui.html(f"""<style>
 .st-key-sk_pick_A button, .st-key-sk_pick_B button {{ min-height: 44px; padding: 0 14px; }}
 .st-key-sk_pick_A button[kind="primary"] {{ background: {ui.INK}; border-color: {ui.INK}; color: #F2F4F2; }}
 .st-key-sk_pick_B button[kind="primary"] {{ background: {ui.BLUE}; border-color: {ui.BLUE}; color: #F2F4F2; }}
+/* Streamlit greys out the page while a tap is processed; on quick taps that reads as a stutter, so keep it at full strength */
+[data-testid="stMain"] [data-stale="true"] {{ opacity: 1 !important; transition: none !important; }}
 .st-key-sk_ticket {{ background: {ui.PANEL}; border: 1px solid {ui.RULE}; padding: 20px 26px 22px !important; margin-top: 16px; }}
 .st-key-sk_ticket [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
 @media (max-width: 640px) {{
@@ -168,6 +170,22 @@ def setup():
             with c2:
                 if st.button("Resume", key=f"res_{s['_id']}", width="stretch"):
                     ss.sk_sid = s["_id"]; ss.sk_step = "maps"; ss.pop("sk_draft", None); st.rerun()
+    series_form(S, editing)
+    if editing and st.button("Cancel"):
+        ss.pop("sk_setup", None); ss.sk_step = "maps"; st.rerun()
+    if editing:
+        return
+    roster()
+    settings()
+    ui.html(f"<div style='border-top:1px solid {ui.RULE}; margin-top:32px; padding-top:16px; font-size:16px; font-weight:500'>Backup</div>")
+    ui.html("<div style='height:8px'></div>")
+    st.download_button("Download Full Backup (CSV)", data.backup_csv(), f"cb_league_backup_{dt.date.today().isoformat()}.csv", "text/csv")
+
+
+# A fragment: tapping a player, Change, Done or best of reruns only this section, not the Players list, Season Settings
+# or the backup file below it. Start Series / Save Changes call st.rerun(), which reloads the whole page as before.
+@st.fragment
+def series_form(S, editing):
     ui.html(ui.h2("Edit the Series" if editing else "Set Up the Series", margin_top=24, rule=False))
     # the matchup ticket: a live preview of the series, filled in after the controls below have run
     ticket = st.empty()
@@ -307,16 +325,7 @@ def setup():
         else:
             ss.sk_sid = data.create_series(title, date, fmt, bo, A, B, pub, priv)
         ss.pop("sk_setup", None); ss.sk_step = "maps"; ss.pop("sk_draft", None)
-        st.rerun()
-    if editing and st.button("Cancel"):
-        ss.pop("sk_setup", None); ss.sk_step = "maps"; st.rerun()
-    if editing:
-        return
-    roster()
-    settings()
-    ui.html(f"<div style='border-top:1px solid {ui.RULE}; margin-top:32px; padding-top:16px; font-size:16px; font-weight:500'>Backup</div>")
-    ui.html("<div style='height:8px'></div>")
-    st.download_button("Download Full Backup (CSV)", data.backup_csv(), f"cb_league_backup_{dt.date.today().isoformat()}.csv", "text/csv")
+        st.rerun(scope="app")
 
 
 # ---------------------------------------------------------------- players

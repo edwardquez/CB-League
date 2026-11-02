@@ -208,10 +208,13 @@ def read(image: bytes, known_maps: list[str] | tuple = ()) -> dict:
     out = {"ok": True, "error": None, "mode": mode, "map": _match_map(raw_map, list(known_maps)),
            "game_time": _secs(gt.group(1)) if gt else None, "warnings": [], "header_flags": {}, "rows": []}
     big_cfg = "--psm 7 -c tessedit_char_whitelist=0123456789"
-    score = []
-    for xc in (852, 1067):
-        t = _text(_prep(crop(ya - 270 * s, ya - 202 * s, xc - 60, xc + 60), 0.5 / s), big_cfg)
-        score.append(int(t) if t.isdigit() else None)
+    score, score_note = [], None
+    for xc in (852, 1067):   # big thin digits: read twice with different settings; a disagreement gets flagged
+        c = crop(ya - 270 * s, ya - 202 * s, xc - 60, xc + 60)
+        t1, t2 = _text(_prep(c, 0.5 / s, "fixed"), big_cfg), _text(_prep(c, 0.75 / s), big_cfg)
+        score.append(int(t1) if t1.isdigit() else int(t2) if t2.isdigit() else None)
+        if t1.isdigit() and t2.isdigit() and t1 != t2:
+            score_note = f"two readings disagree ({t1} or {t2})"
     out["score"] = score
     lbl = _text(_prep(crop(ya - 45 * s, ya - 5 * s, 990, 1095), cs), "--psm 6").upper()
     out["final"] = "CURRENT" not in lbl
@@ -228,6 +231,8 @@ def read(image: bytes, known_maps: list[str] | tuple = ()) -> dict:
         return out
     if None in score:
         out["header_flags"]["score"] = "couldn't read the score"
+    elif score_note:
+        out["header_flags"]["score"] = score_note
     if out["game_time"] is None:
         out["header_flags"]["game_time"] = "couldn't read the total game time"
     if not out["final"]:
@@ -327,7 +332,8 @@ def _check(b: dict) -> None:
     if b["final"] and None not in (sa, sb):
         win = {"HP": 250, "SND": 6}[b["mode"]]
         if max(sa, sb) != win:
-            b["warnings"].append(f"Neither team is on {win}. Fine if the map ended on time; otherwise check the score.")
+            b["warnings"].append(f"Neither team is on {win}. Fine if the map was ended early{' or on time' if win == 250 else ''}; "
+                                 "otherwise check the score.")
             b["header_flags"].setdefault("score", f"no team on {win}")
         if sa == sb:
             b["header_flags"]["score"] = "the score is tied"

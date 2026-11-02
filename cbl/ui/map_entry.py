@@ -315,6 +315,37 @@ def entry(c: Ctx, D: dict) -> None:
             if st.button("Back to player stats", key=f"{px}_miss_{k}"):
                 D["sub"] = "players"; D["p"] = [p for p, _ in lineup].index(missing[0]); st.rerun()
             return
+        from_shot = bool(D.get("ocr_vals"))
+        hdr_warn = []
+        if from_shot:
+            # score and game time can be fixed right here; yellow while they still match a reading the reader wasn't sure of
+            for nm in ("sa", "sb", "lm", "ls"):      # pick up an edit made on the last run before deciding what's still yellow
+                if f"{px}_{k}_{nm}" in st.session_state:
+                    D[nm] = st.session_state[f"{px}_{k}_{nm}"]
+            hf, h0 = D.get("hdr_flags", {}), D.get("ocr_hdr", {})
+            score_look = "score" in hf and (D["sa"], D["sb"]) == (h0.get("sa"), h0.get("sb"))
+            time_look = "game_time" in hf and (D["lm"], D["ls"]) == (h0.get("lm"), h0.get("ls"))
+            yl = ([f"{px}_{k}_sa", f"{px}_{k}_sb"] if score_look else []) + ([f"{px}_{k}_lm", f"{px}_{k}_ls"] if time_look else [])
+            if yl:
+                ui.html("<style>" + ", ".join(f'[class*="st-key-{x}"] input' for x in yl) + f" {{ background:{YELLOW} !important; }}</style>")
+            ui.html(ui.label("Score and Game Time", margin_top=14))
+            c1, c2, c3, c4 = st.columns([1, 1, 0.7, 0.7])
+            with c1:
+                field(st.number_input, f"{c.label_a or 'Team A'} score", f"{px}_{k}_sa", D, "sa", None, min_value=0, step=1)
+            with c2:
+                field(st.number_input, f"{c.label_b or 'Team B'} score", f"{px}_{k}_sb", D, "sb", None, min_value=0, step=1)
+            with c3:
+                field(st.number_input, "Minutes", f"{px}_{k}_lm", D, "lm", None, min_value=0, max_value=59, step=1, placeholder="—")
+            with c4:
+                field(st.number_input, "Seconds", f"{px}_{k}_ls", D, "ls", None, min_value=0, max_value=59, step=1, placeholder="—")
+            if score_look:
+                hdr_warn.append(("Check this one:", f"the score ({hf['score']}). Compare it with the picture and fix it above if needed."))
+            if time_look:
+                hdr_warn.append(("Check this one:", f"the total game time ({hf['game_time']}). Fix it above if needed."))
+            if D["sa"] is None or D["sb"] is None or D["sa"] == D["sb"]:
+                ui.html(ui.note("Enter both scores (a map needs a winner) to save.", 4, 12))
+        if D["sa"] is None or D["sb"] is None:
+            return
         win = "A" if D["sa"] > D["sb"] else "B"
         ln = (D["lm"] or 0) * 60 + (D["ls"] or 0) if (D["lm"] is not None or D["ls"] is not None) else None
         ui.html("<div style='display:grid; grid-template-columns:120px minmax(0,1fr); gap:14px; align-items:center; margin-top:14px'>"
@@ -323,7 +354,6 @@ def entry(c: Ctx, D: dict) -> None:
                 f"{ui.mmss(ln) if ln else 'no match length'} · {'Partial' if D['board'] == 'partial' else 'Full'} scoreboard</div></div></div>")
         req, opt = stat_fields(tcfg, D["mode"])
         ext = extra_fields(D["mode"])
-        from_shot = bool(D.get("ocr_vals"))
         if from_shot:   # every column, so each number can be checked against the picture
             show = [f for f in opt + ext if f != "accuracy"]
         else:
@@ -346,10 +376,20 @@ def entry(c: Ctx, D: dict) -> None:
                          + [(short.get(f) or STAT_LABELS[f].replace(" (sec)", ""), "right") for f in show],
                          body, min_width=420 + (40 * len(show) if from_shot else 0), cell_pad="9px 6px"))
         if from_shot:
-            n_look = sum(1 for p, _ in lineup for f in req + opt + ext if needs_look(D, p, f))
+            looks = [(j, p, f, needs_look(D, p, f)) for j, (p, _) in enumerate(lineup) for f in req + opt + ext if needs_look(D, p, f)]
+            n_look = len(looks)
             ui.html(ui.note((f"{n_look} number{'s' if n_look != 1 else ''} in yellow: the reader wasn't sure. Check {'them' if n_look != 1 else 'it'} "
-                             "against the picture and fix with Edit. Hover a yellow cell for the reason." if n_look
+                             "against the picture, and use Fix to jump straight to one. Hover a yellow cell for the reason." if n_look
                              else "Read from the screenshot; the reader was sure of every number."), 6, 12))
+            if looks:
+                def go_fix(j):
+                    D["sub"] = "players"; D["p"] = j
+                with st.container(horizontal=True, gap="small", key=f"{px}_fixes_{k}"):
+                    for n, (j, p, f, why) in enumerate(looks[:12]):
+                        st.button(f"Fix {p} · {STAT_LABELS[f].replace(' (sec)', '')}", key=f"{px}_fix_{k}_{n}", on_click=go_fix, args=(j,),
+                                  width="content")
+                if n_look > 12:
+                    ui.html(ui.note(f"And {n_look - 12} more: use Edit for those players.", 4, 12))
             if D.get("ocr_img"):
                 with st.expander("Show the Screenshot"):
                     st.image(D["ocr_img"], width="stretch")
@@ -358,7 +398,7 @@ def entry(c: Ctx, D: dict) -> None:
             if ec[j % len(ec)].button(f"Edit {p}", key=f"{px}_rev_{k}_{p}", width="stretch"):
                 D["sub"] = "players"; D["p"] = j; st.rerun()
         warns = checks(tcfg, D, lineup, rows, (la, lb) if c.label_a else ("Team A", "Team B"))
-        warns = [("Check this one:", w) for w in D.get("ocr_warn", [])] + warns
+        warns = hdr_warn + [("Check this one:", w) for w in D.get("ocr_warn", [])] + warns
         if D["board"] == "partial":
             ui.html(ui.note("Partial scoreboard: blanks are saved as unknown, not zero, so they don’t drag down anyone’s averages.", 10, 13))
         if not warns:
@@ -531,8 +571,10 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
                 D["crops"][p] = r.get("crop")
                 if r["name"]:
                     mem[r["name"]] = p
-            hw = {"score": "the score", "game_time": "the total game time"}
-            D["ocr_warn"] = list(B.get("warnings", [])) + [f"Check {hw.get(f, f)} against the picture: {w}." for f, w in hf.items()]
+            # board-level notes; score notes are worked out on the review step, so fixing the score clears them
+            D["ocr_warn"] = [w for w in B.get("warnings", []) if not w.startswith("Neither team is on")]
+            D["hdr_flags"] = dict(hf)
+            D["ocr_hdr"] = {"sa": D["sa"], "sb": D["sb"], "lm": D["lm"], "ls": D["ls"]}
             D["id"] = uuid.uuid4().hex[:8]       # fresh widgets, so every field shows the filled-in value
             D["up_n"] = D.get("up_n", 0) + 1
             D["sub"] = "review" if D["map"] and D["sa"] is not None and D["sb"] is not None else "info"
