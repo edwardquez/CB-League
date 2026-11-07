@@ -56,7 +56,7 @@ projections, records and tournaments, with match entry by scoreboard screenshot.
 
 Match entry reads the Codcaster scoreboard with [Tesseract OCR](https://github.com/tesseract-ocr/tesseract). Upload the
 end-of-map board, say which row is which player (saved gamertags fill this in automatically), check the review and save.
-Hardpoint and Search and Destroy are supported, 3v3 and 4v4, Modern Warfare 4 and Black Ops 7.
+Hardpoint, Search and Destroy and Hijack are supported, 2v2 to 4v4, Modern Warfare 4 and Black Ops 7.
 
 <table>
 <tr>
@@ -70,8 +70,9 @@ How it stays accurate:
 - The board is found by its two team lines, so any size or crop works as long as the whole scoreboard is in the picture.
 - Each column only accepts the characters it can contain (a time has a colon, damage is digits).
 - Unsure readings are read a second time with different image settings, and any disagreement is flagged.
-- The columns are checked against each other: non-traded kills can't exceed kills, and in Search and Destroy every
-  per-round stat must match its total divided by the rounds played.
+- The columns are checked against each other: non-traded kills can't exceed kills, in Search and Destroy every
+  per-round stat must match its total divided by the rounds played, and in Hijack each team's data uploaded must add
+  up to its score.
 - Nothing is saved until a person presses Save on the review step. Highlighted cells show the reason on hover.
 
 The screenshot is never stored. Only the numbers are saved, the same as typing them in.

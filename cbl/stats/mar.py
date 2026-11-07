@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 # stats a whole team shares (scale with team size); assists/first bloods don't
-TEAM_SHARED = ("hill_time", "overloads", "carrier_kills", "bombs_planted", "kills_as_carrier")
+TEAM_SHARED = ("hill_time", "overloads", "carrier_kills", "bombs_planted", "kills_as_carrier", "dunks", "remote_plants", "interceptions")
 
 
 def _fill(pm: pd.DataFrame, col: str) -> pd.Series:
@@ -46,16 +46,22 @@ def compute(pm: pd.DataFrame, title_cfg: dict, borrow_cfg: dict | None = None,
     fbn = (pm.get("first_bloods") - pm.get("first_deaths")).astype(float).fillna(0.0) if "first_bloods" in pm else 0.0 * a
     hill = pm["hill_time"].astype(float).fillna(0.0) if "hill_time" in pm else 0.0 * a
     ovl = pm["overloads"].astype(float).fillna(0.0) if "overloads" in pm else 0.0 * a
-    work = pd.DataFrame({"a": a, "ck": ck, "kac": kac, "pl": pl, "fbn": fbn, "hill": hill, "ovl": ovl,
+    # Hijack: a dunk (carried in, 30 points) or remote plant (thrown in, 15) starts an upload, like an overload scores;
+    # an interception stops a thrown Spike, like a carrier kill stops an overload. Data uploaded isn't counted on top:
+    # it's mostly those same plants' points, so it would count them twice.
+    dk, rp, itc = _fill(pm, "dunks"), _fill(pm, "remote_plants"), _fill(pm, "interceptions")
+    work = pd.DataFrame({"a": a, "ck": ck, "kac": kac, "pl": pl, "fbn": fbn, "hill": hill, "ovl": ovl, "dk": dk, "rp": rp, "itc": itc,
                          "mode": pm["mode"], "lob": pm["lob"]})
     f = 3.0 / pm["team_size"].astype(float)
-    av3 = work[work.lob == "3v3"].groupby("mode")[["a", "ck", "kac", "pl", "fbn", "hill", "ovl"]].mean()
+    AVG = ["a", "ck", "kac", "pl", "fbn", "hill", "ovl", "dk", "rp", "itc"]
+    av3 = work[work.lob == "3v3"].groupby("mode")[AVG].mean()
     if borrow_pm is not None and len(borrow_pm):  # modes with no 3v3 maps yet: borrow averages
         bw = borrow_pm
         bav = pd.DataFrame({"a": _fill(bw, "assists"), "ck": _fill(bw, "carrier_kills"), "kac": _fill(bw, "kills_as_carrier"),
                             "pl": bw["bombs_planted"].fillna(0), "fbn": (bw.first_bloods - bw.first_deaths).fillna(0),
-                            "hill": bw.hill_time.fillna(0), "ovl": bw.overloads.fillna(0), "mode": bw["mode"], "lob": bw["lob"]})
-        bav = bav[bav.lob == "3v3"].groupby("mode")[["a", "ck", "kac", "pl", "fbn", "hill", "ovl"]].mean()
+                            "hill": bw.hill_time.fillna(0), "ovl": bw.overloads.fillna(0), "dk": _fill(bw, "dunks"),
+                            "rp": _fill(bw, "remote_plants"), "itc": _fill(bw, "interceptions"), "mode": bw["mode"], "lob": bw["lob"]})
+        bav = bav[bav.lob == "3v3"].groupby("mode")[AVG].mean()
         av3 = av3.combine_first(bav)
     b = lambda c: pm["mode"].map(av3[c]).fillna(0.0) if c in av3 else pd.Series(0.0, index=pm.index)  # noqa: E731
 
@@ -73,7 +79,9 @@ def compute(pm: pd.DataFrame, title_cfg: dict, borrow_cfg: dict | None = None,
         hs = g("hill_sec_per_kill"); ss = sel
         o = np.where(hs > 0, (hill[ss] - b("hill")[ss] * f[ss]) / hs.replace(0, np.nan), 0.0)
         o = pd.Series(np.nan_to_num(o), index=hs.index) + g("overload") * (ovl[ss] - b("ovl")[ss] * f[ss]) \
-            + g("carrier_kill") * (ck[ss] - b("ck")[ss] * f[ss]) + g("plant") * (pl[ss] - b("pl")[ss] * f[ss])
+            + g("carrier_kill") * (ck[ss] - b("ck")[ss] * f[ss]) + g("plant") * (pl[ss] - b("pl")[ss] * f[ss]) \
+            + g("dunk") * (dk[ss] - b("dk")[ss] * f[ss]) + g("remote_plant") * (rp[ss] - b("rp")[ss] * f[ss]) \
+            + g("interception") * (itc[ss] - b("itc")[ss] * f[ss])
         q = aw * (a[ss] - b("a")[ss]) + g("fb_margin") * (fbn[ss] - b("fbn")[ss]) + g("kill_as_carrier") * (kac[ss] - b("kac")[ss] * f[ss])
         obj[ss] = o; play[ss] = q
     conv = {mo: m["modes"].get(mo, {}) for mo in pm["mode"].unique()}

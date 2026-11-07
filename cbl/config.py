@@ -19,10 +19,15 @@ STAT_LABELS = {
     # read off the caster scoreboard; optional, kept under More Stats when typing by hand
     "avg_hill_time": "Avg hill time (sec)", "contested_hill_time": "Contested hill (sec)", "kills_per_hill": "Kills/hill",
     "dmg_per_hill": "Dmg/hill", "bombs_defused": "Defuses", "kills_per_round": "Kills/round", "dmg_per_round": "Dmg/round",
+    # Hijack (caster scoreboard columns)
+    "data_uploaded": "Data uploaded", "hj_plants": "Plants", "dunks": "Dunks", "remote_plants": "Remote plants",
+    "passes": "Passes", "interceptions": "Interceptions",
 }
 # extra scoreboard stats per mode (not used by MAR; saved as the board shows them)
 EXTRA_STATS = {"HP": ["avg_hill_time", "contested_hill_time", "kills_per_hill", "dmg_per_hill"],
-               "SND": ["bombs_defused", "kills_per_round", "dmg_per_round"]}
+               "SND": ["bombs_defused", "kills_per_round", "dmg_per_round"],
+               # Hijack: all six for now; whichever becomes its MAR objective stat can move into the mode's main stats later
+               "HJ": ["data_uploaded", "hj_plants", "dunks", "remote_plants", "passes", "interceptions"]}
 FLOAT_STATS = {"accuracy", "kills_per_hill", "dmg_per_hill", "kills_per_round", "dmg_per_round"}
 CORE_STATS = ["kills", "deaths", "assists", "damage", "non_traded_kills", "highest_streak"]
 

@@ -103,8 +103,12 @@ def checks(tcfg: dict, d: dict, lineup, rows, names=("Team A", "Team B")):
     if d["sa"] is not None and d["sb"] is not None and d["sa"] == d["sb"]:
         out.append(("Check this one:", "the score is tied. A map needs a winner; re-check the scores."))
     ws = mcfg.get("win_score")
-    if ws and d["sa"] is not None and d["sb"] is not None and max(d["sa"], d["sb"]) != ws:
-        out.append(("Heads up:", f"the winning score is {max(d['sa'], d['sb'])}, not {ws}. Fine if the map ended early; otherwise re-check."))
+    # Hijack's finished-upload bonus can carry a team past 300, so only a score short of the target is unusual there
+    if ws and d["sa"] is not None and d["sb"] is not None:
+        top = max(d["sa"], d["sb"])
+        if top < ws or (top > ws and d["mode"] != "HJ"):
+            out.append(("Heads up:", f"the winning score is {top}, not {ws}. Fine if the map ended early"
+                                     f"{'' if d['mode'] == 'SND' else ' or on time'}; otherwise re-check."))
     nm = {"A": names[0], "B": names[1]}
     # read cleanly off the scoreboard (nothing flagged or changed): a kills/deaths gap is real, not a typo
     clean = bool(d.get("ocr_vals")) and all(
@@ -371,7 +375,8 @@ def entry(c: Ctx, D: dict) -> None:
                         + [cell(p, f) for f in show])
         short = {"non_traded_kills": "NTK", "highest_streak": "Streak", "objective_kills": "Obj", "avg_hill_time": "Avg hill", "contested_hill_time": "Contested",
                  "kills_per_hill": "K/hill", "dmg_per_hill": "Dmg/hill", "kills_per_round": "K/round", "dmg_per_round": "Dmg/round", "first_bloods": "FB",
-                 "first_deaths": "FD", "bombs_planted": "Plants", "bombs_defused": "Defuses", "hill_time": "Hill"} if from_shot else {}
+                 "first_deaths": "FD", "bombs_planted": "Plants", "bombs_defused": "Defuses", "hill_time": "Hill",
+                 "data_uploaded": "Data", "hj_plants": "Plants", "remote_plants": "Remote", "interceptions": "Int"} if from_shot else {}
         ui.html(ui.table([("Player", "left"), ("K", "right"), ("D", "right"), ("K/D", "right")]
                          + [(short.get(f) or STAT_LABELS[f].replace(" (sec)", ""), "right") for f in show],
                          body, min_width=420 + (40 * len(show) if from_shot else 0), cell_pad="9px 6px"))
@@ -498,7 +503,9 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
             short = {"kills": "K", "deaths": "D", "assists": "A", "non_traded_kills": "NTK", "highest_streak": "Streak", "damage": "Dmg",
                      "hill_time": "Hill", "avg_hill_time": "Avg hill", "objective_kills": "Obj", "contested_hill_time": "Contested",
                      "kills_per_hill": "K/hill", "dmg_per_hill": "Dmg/hill", "bombs_planted": "Plants", "bombs_defused": "Defuses",
-                     "first_bloods": "FB", "first_deaths": "FD", "kills_per_round": "K/round", "dmg_per_round": "Dmg/round"}
+                     "first_bloods": "FB", "first_deaths": "FD", "kills_per_round": "K/round", "dmg_per_round": "Dmg/round",
+                     "data_uploaded": "Data", "hj_plants": "Plants", "dunks": "Dunks", "remote_plants": "Remote", "passes": "Passes",
+                     "interceptions": "Int"}
 
             def fmt(r, f):
                 v = r["stats"].get(f)

@@ -13,7 +13,7 @@ MODEN = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ"
 
 ui.html(ui.note("What every stat on the site means and how it's calculated. The season picker changes the modes and MAR values shown, since each game has its own.", 0, 15))
 jumps = [("mar", "MAR"), ("core", "Core Stats"), ("hp", "Hardpoint"), ("snd", "Search and Destroy"), ("ovl", "Overload"),
-         ("radar", "Playstyle Radar"), ("proj", "Projections"), ("ocr", "Screenshot Entry"), ("other", "Other Terms")]
+         ("hj", "Hijack"), ("radar", "Playstyle Radar"), ("proj", "Projections"), ("ocr", "Screenshot Entry"), ("other", "Other Terms")]
 # jump links styled as the site's boxed buttons
 ui.html(f"<style>.cb-gjump a{{color:{ui.INK} !important; text-decoration:none !important; min-height:40px; display:inline-flex; align-items:center; "
         f"padding:0 14px; border:1px solid {ui.RULE}; border-radius:2px; background:transparent; box-sizing:border-box}}"
@@ -40,9 +40,13 @@ if e is not None and not e.empty:
     base = e.pm.drop(columns=["ke", "kpw", "mar", "c_net", "c_obj", "c_play", "c_repl"], errors="ignore")
     attrs = marmod.compute(base, src).attrs
 avg = attrs.get("avg3", {})
-modes = ver.get("modes", {})
+modes = dict(ver.get("modes", {}))
+if not (modes.get("HJ") or {}).get("dunk"):   # a borrowed title has no Hijack; show this season's own Hijack values
+    own = ((cfg.get("mar_versions") or [{}])[-1] or cfg.get("mar", {})).get("modes", {}).get("HJ") or {}
+    if own.get("dunk"):
+        modes["HJ"] = own
 steps = [("Net kills", "Kills minus deaths for the map."),
-         ("Add objective and playmaking", "Objective stats (hill time, overloads, carrier kills, plants) and playmaking (assists, opening duels, kills as carrier) "
+         ("Add objective and playmaking", "Objective stats (hill time, overloads, carrier kills, plants, and Hijack's dunks, remote plants and interceptions) and playmaking (assists, opening duels, kills as carrier) "
                                           "become kill-equivalents (KE), compared with the average for that mode and lobby size."),
          ("Compare to a fill-in", "Subtract what a replacement-level player produces in that mode. This is the Replacement Credit row on each Player Dashboard."),
          ("Convert to map wins", "Divide by how many KE it takes to swing one map in that mode.")]
@@ -61,7 +65,7 @@ if not cfg.get("calibrated", True):
                          f"MAR starts from {src.get('name', 'last season')}'s values and blends in {cfg.get('name', 'this season')}'s own as maps are played, "
                          f"reaching an even mix at {cfg.get('provisional_maps', 8)} maps per mode. A brand-new mode borrows the closest mode's values "
                          "(Overload for Hijack) and shows a Provisional tag until then. Conversions for any new mode are set in the season's settings once "
-                         "its scoreboard is known. The values below are the ones being borrowed.")
+                         "its scoreboard is known. The values below are the ones being borrowed, plus this season's own Hijack values.")
 
 if modes:
     f2 = lambda v: f"{v:.2f}"  # noqa: E731
@@ -75,6 +79,11 @@ if modes:
                  ("Carrier kill", f"+{m.get('carrier_kill', 1.5):g} kills", "Objective · Overload", f2(avg.get("ck", {}).get("OVL", 0)))]
     if "SND" in modes:
         conv.append(("Plant", f"{modes['SND'].get('plant', 1):g} kill", "Objective · Search and Destroy", f2(avg.get("pl", {}).get("SND", 0))))
+    if (modes.get("HJ") or {}).get("dunk"):
+        m = modes["HJ"]
+        conv += [("Dunk", f"{m.get('dunk', 3):g} kills", "Objective · Hijack", f2(avg.get("dk", {}).get("HJ", 0))),
+                 ("Remote plant", f"{m.get('remote_plant', 2.5):g} kills", "Objective · Hijack", f2(avg.get("rp", {}).get("HJ", 0))),
+                 ("Interception", f"{m.get('interception', 1.5):g} kills", "Objective · Hijack", f2(avg.get("itc", {}).get("HJ", 0)))]
     conv.append(("Assist", f"{ver.get('assist', 0.25):g} kill", "Playmaking · every mode",
                  " · ".join(f"{a[k]:.1f} {({'HP': 'HP', 'SND': 'SnD', 'OVL': 'OVL'}).get(k, k)}" for k in ("HP", "SND", "OVL") if k in a)))
     if "SND" in modes:
@@ -161,6 +170,24 @@ groups = [
         T("Overloads", "OVL", "Scored by carrying the device into the enemy goal.", "In MAR, each overload is worth three kills."),
         T("Carrier kills", "CK", "Kills on the enemy carrier, stopping a possible score.", "In MAR, each is worth an extra 1.5 kills on top of the kill itself."),
         T("Kills as carrier", "KAC", "Kills while carrying the device.", "In MAR (Playmaking), each is worth an extra kill.")]),
+    ("hj", "Hijack", [
+        T("Hijack", "Mode", "One Data Spike spawns mid-map. Teams carry or pass it to the enemy Comm Station and plant it, by dunking it "
+                            "on foot or throwing it in from range. A planted Spike keeps uploading points until the defenders clear it. First "
+                            "to 300 over two rounds, or the higher score when time runs out."),
+        T("Data uploaded", "Data", "Points a player's plants earned for their team: 30 for a dunk or 15 for a remote plant, then 1 a second "
+                                   "while the Spike stays planted, up to 30 more. A team's score is its players' data uploaded added up.",
+          "Read from the caster scoreboard, where each team's column must add up to its score. Not counted in MAR on its own: it's mostly "
+          "the points from that player's dunks and remote plants, which MAR already counts."),
+        T("Plants", "Hijack", "Every Data Spike a player planted at the enemy Comm Station: dunks plus remote plants. Separate from Search and "
+                              "Destroy bomb plants."),
+        T("Dunks", "Hijack", "Plants made by carrying the Spike into the Comm Station on foot. Worth 30 points straight away; the carrier "
+                             "has to break into the enemy base to do it.", "In MAR, each dunk is worth three kills, the same as an overload."),
+        T("Remote plants", "Remote", "Plants made by throwing the Spike onto the Comm Station from a distance, often from a set lineup. Worth 15 "
+                                     "points straight away; safer, but the throw can be shot down or caught.",
+          "In MAR, each remote plant is worth 2.5 kills: a little less than a dunk."),
+        T("Passes", "Hijack", "Throws of the Data Spike to a teammate."),
+        T("Interceptions", "Int", "Enemy throws caught or shot out of the air, taking the Spike away mid-pass.",
+          "In MAR, each is worth 1.5 kills, like a carrier kill in Overload: it stops a likely score.")]),
     ("radar", "Playstyle Radar", [
         T("Slaying", "Spoke", "Kills, K/D and damage per map combined."),
         T("Objective", "Spoke", "Hill time (counts double) and overloads. Carrier kills count toward Defense instead."),
@@ -184,7 +211,7 @@ groups = [
         T("Track record", "", "Second-half maps re-projected using only earlier games, then compared with what actually happened.")]),
     ("ocr", "Screenshot Entry", [
         T("Fill From Screenshot", "Scorekeeper", "Fills in a whole map from a picture of the Codcaster scoreboard: mode, map, score, game time and every player's stats.",
-          "Works for Hardpoint and Search and Destroy, 3v3 and 4v4, in Modern Warfare 4 and Black Ops 7. Hijack follows once its scoreboard is available."),
+          "Works for Hardpoint, Search and Destroy and Hijack, 2v2 to 4v4, in Modern Warfare 4 and Black Ops 7."),
         T("OCR", "Optical character recognition", "Software that reads text from a picture. The site uses Tesseract, a free, open-source OCR engine that runs on "
                                                   "the site's own server, so screenshots never go to an outside service.",
           "Tesseract only reads characters. Finding the board, knowing which number belongs to which stat, and checking the results is done by the site."),
@@ -199,7 +226,8 @@ groups = [
         T("Math checks", "", "Numbers are checked against each other: non-traded kills and best streak can't exceed kills, average hill time can't exceed "
                              "hill time, and on a final scoreboard one team should be on 250 (Hardpoint) or 6 (SnD).",
           "Search and Destroy gets the strongest check: kills per round and damage per round must match kills and damage divided by the rounds played, "
-          "and first bloods and first deaths must each add up to the number of rounds. A misread number almost always breaks one of these."),
+          "and first bloods and first deaths must each add up to the number of rounds. In Hijack, each team's data uploaded must add up to "
+          "its score. A misread number almost always breaks one of these."),
         T("Who Is Who", "Matching players", "Each scoreboard row is matched to a league player by their saved gamertags. Capitals, spaces, underscores "
                                             "and special characters are ignored, so small misreads still match.",
           "Rows that don't match (bots, or a gamertag that isn't saved yet) are picked from a dropdown. Within a session the site remembers those picks, "

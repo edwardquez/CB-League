@@ -6,7 +6,8 @@ import pandas as pd
 STAT_COLS = ["kills", "deaths", "assists", "non_traded_kills", "highest_streak", "damage", "hill_time",
              "objective_kills", "first_bloods", "first_deaths", "bombs_planted", "overloads",
              "carrier_kills", "kills_as_carrier", "accuracy", "avg_hill_time", "contested_hill_time", "kills_per_hill",
-             "dmg_per_hill", "bombs_defused", "kills_per_round", "dmg_per_round"]
+             "dmg_per_hill", "bombs_defused", "kills_per_round", "dmg_per_round",
+             "data_uploaded", "hj_plants", "dunks", "remote_plants", "passes", "interceptions"]
 
 
 def series_frame(series: list[dict], matches: list[dict]) -> pd.DataFrame:

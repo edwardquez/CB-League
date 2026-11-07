@@ -24,16 +24,16 @@ modes:
     score_label: Points
     win_score: 250
     stats: [hill_time, objective_kills]
-    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
-    retired_maps: []
+    maps: [Lithium, Lotus, Munition, Reactor U92, Rooftops, Sentry]   # official version 1 map set (Nov 2026)
+    retired_maps: [Coal, Mumbai, Silkworm]
   SND:
     name: Search and Destroy
     short: SnD
     score_label: Rounds
     win_score: 6
     stats: [first_bloods, first_deaths, bombs_planted]
-    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
-    retired_maps: []
+    maps: [Coal, Lotus, Munition, Reactor U92, Rooftops, Silkworm]   # official version 1 map set (Nov 2026)
+    retired_maps: [Lithium, Mumbai, Sentry]
   OVL:
     name: Overload
     short: Overload
@@ -41,16 +41,15 @@ modes:
     win_score: null
     stats: [overloads, carrier_kills, kills_as_carrier, accuracy]
     maps: []
-    retired_maps: []
     active: false            # not in Modern Warfare 4
   HJ:
     name: Hijack
     short: Hijack
     score_label: Score
-    win_score: null
-    stats: []                # add Hijack's objective stat once the scoreboard is known
-    maps: [Coal, Lithium, Lotus, Mumbai, Munition, Reactor U92, Rooftops, Sentry, Silkworm]
-    retired_maps: []
+    win_score: 300           # first to 300 over two rounds, or the higher score when time runs out
+    stats: []                # its stats are read from the scoreboard (More Stats); MAR counts dunks, remote plants and interceptions
+    maps: [Lithium, Lotus, Munition]   # official version 1 map set (Nov 2026)
+    retired_maps: [Coal, Mumbai, Reactor U92, Rooftops, Sentry, Silkworm]
     borrow_mode: OVL
 
 mar:
@@ -59,6 +58,6 @@ mar:
     HP:  {hill_sec_per_kill: 2.5}
     SND: {plant: 1.0, fb_margin: 0.5}
     OVL: {overload: 3.0, carrier_kill: 1.5, kill_as_carrier: 1.0}
-    HJ:  {}
+    HJ:  {dunk: 3.0, remote_plant: 2.5, interception: 1.5}   # dunk like an overload, remote plant a bit less, interception like a carrier kill
   lobby_prior: {HP: 1.3333, SND: 1.0, OVL: 1.3333, HJ: 1.3333}
   lobby_k: 10

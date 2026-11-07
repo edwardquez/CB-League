@@ -47,7 +47,8 @@ MODEN = me.MODEN
 SHORT = me.SHORT
 CONV = {"HP": [("hill_sec_per_kill", "Hill time: seconds per kill")],
         "SND": [("plant", "Plant (kills)"), ("fb_margin", "First-blood margin (kills)")],
-        "OVL": [("overload", "Overload (kills)"), ("carrier_kill", "Carrier kill (extra kills)"), ("kill_as_carrier", "Kill as carrier (kills)")]}
+        "OVL": [("overload", "Overload (kills)"), ("carrier_kill", "Carrier kill (extra kills)"), ("kill_as_carrier", "Kill as carrier (kills)")],
+        "HJ": [("dunk", "Dunk (kills)"), ("remote_plant", "Remote plant (kills)"), ("interception", "Interception (kills)")]}
 
 
 def secret_pw():

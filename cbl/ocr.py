@@ -9,7 +9,7 @@ or crop as long as the whole scoreboard is in it. Every number is checked: its s
 digits), Tesseract's own confidence (a second reading with different image settings when it's unsure), and the math
 between columns (non-traded kills can't exceed kills; in SnD kills/round must equal kills / rounds). Anything that
 fails is returned in the row's `flags`, with the reason, so the app can highlight it for a person to check.
-Hardpoint and Search and Destroy are supported; Hijack waits until Codcaster shows its scoreboard.
+Hardpoint, Search and Destroy and Hijack are supported.
 """
 from __future__ import annotations
 
@@ -28,6 +28,8 @@ COLUMNS = {
            "contested_hill_time", "kills_per_hill", "dmg_per_hill"],
     "SND": ["kd", "assists", "non_traded_kills", "highest_streak", "damage", "bombs_planted", "bombs_defused", "first_bloods",
             "first_deaths", "kills_per_round", "dmg_per_round"],
+    "HJ": ["kd", "assists", "non_traded_kills", "highest_streak", "damage", "data_uploaded", "hj_plants", "dunks", "remote_plants",
+           "passes", "interceptions"],
 }
 TIMES = {"hill_time", "avg_hill_time", "contested_hill_time"}
 RATIOS = {"kills_per_hill", "dmg_per_hill", "kills_per_round", "dmg_per_round"}
@@ -220,14 +222,13 @@ def read(image: bytes, known_maps: list[str] | tuple = ()) -> dict:
     out["final"] = "CURRENT" not in lbl
     if mode == "?":   # header unreadable: the column headings still tell Hardpoint (Hill Time) from SnD (Bombs Planted)
         col6 = _text(_prep(crop(ya - 45 * s, ya - 5 * s, 1215, 1340), cs), "--psm 6").upper()
-        mode = out["mode"] = "HP" if "HILL" in col6 else "SND" if "BOMB" in col6 or "PLANT" in col6 else "?"
+        mode = out["mode"] = ("HP" if "HILL" in col6 else "SND" if "BOMB" in col6 else "HJ" if "DATA" in col6 or "UPLOAD" in col6 else "?")
     if s < 0.6:
         out["warnings"].append("This picture is small or low quality, so misreads are more likely. Check every number, "
                                "or use a full-size screenshot (VLC's Take Snapshot).")
     if mode not in SUPPORTED:
         out["ok"] = False
-        out["error"] = ("Hijack scoreboards aren't supported yet." if mode == "HJ"
-                        else "Couldn't tell which mode this is. The reader knows Hardpoint and Search and Destroy.")
+        out["error"] = "Couldn't tell which mode this is. The reader knows Hardpoint, Search and Destroy and Hijack."
         return out
     if None in score:
         out["header_flags"]["score"] = "couldn't read the score"
@@ -322,6 +323,16 @@ def _check(b: dict) -> None:
                 flag(r, "dmg_per_round", f"doesn't match damage / {rounds} rounds"); flag(r, "damage", f"doesn't match damage/round x {rounds}")
             if st.get("bombs_planted") is not None and st["bombs_planted"] > rounds:
                 flag(r, "bombs_planted", "more plants than rounds")
+    if b["mode"] == "HJ" and None not in (sa, sb):
+        # a team's Hijack score is the data its players uploaded, so each team's column must add up to its score
+        for team, score in (("alpha", sa), ("bravo", sb)):
+            vals = [r["stats"].get("data_uploaded") for r in b["rows"] if r["team"] == team]
+            if None not in vals and sum(vals) != score:
+                b["warnings"].append(f"{team.title()}'s data uploaded adds up to {sum(vals)}, but its score is {score}. One of them is probably misread.")
+                b["header_flags"].setdefault("score", f"{team.title()}'s data uploaded adds up to {sum(vals)}")
+                for r in b["rows"]:
+                    if r["team"] == team:
+                        flag(r, "data_uploaded", f"{team.title()}'s data uploaded should add up to its score, {score}")
     if rounds:
         for col, label in (("first_bloods", "first bloods"), ("first_deaths", "first deaths")):
             vals = [r["stats"].get(col) for r in b["rows"]]
@@ -329,10 +340,10 @@ def _check(b: dict) -> None:
                 b["warnings"].append(f"The {label} add up to {sum(vals)}, but {rounds} rounds were played. One of them is probably misread.")
                 for r in b["rows"]:
                     flag(r, col, f"{label} don't add up to the {rounds} rounds")
+    win = {"HP": 250, "SND": 6, "HJ": 300}[b["mode"]]
     if b["final"] and None not in (sa, sb):
-        win = {"HP": 250, "SND": 6}[b["mode"]]
-        if max(sa, sb) != win:
-            b["warnings"].append(f"Neither team is on {win}. Fine if the map was ended early{' or on time' if win == 250 else ''}; "
+        if max(sa, sb) < win:
+            b["warnings"].append(f"Neither team is on {win}. Fine if the map was ended early{'' if win == 6 else ' or on time'}; "
                                  "otherwise check the score.")
             b["header_flags"].setdefault("score", f"no team on {win}")
         if sa == sb:
