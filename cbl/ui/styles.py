@@ -80,6 +80,11 @@ button[data-variant="segmented_control"][aria-checked="true"] p {{ color: {BG} !
 .cb-tip.l {{ left: 0; transform: none; }} .cb-tip.r {{ left: auto; right: 0; transform: none; }}
 .cb-tip.below {{ bottom: auto; top: calc(100% + 8px); }}
 .cb-tap:hover .cb-tip, .cb-tap:focus .cb-tip, .cb-tap:focus-within .cb-tip {{ display: block; }}
+/* phones: a tapped cell's details show in a bar pinned to the bottom of the screen, so a scrolling grid can never clip them */
+@media (max-width: 640px) {{
+  .cb-tip, .cb-tip.l, .cb-tip.r, .cb-tip.below {{ position: fixed; top: auto; left: 12px; right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: none; width: auto; max-width: none; z-index: 1000; }}
+}}
 .cb-tap:hover > .hl, .cb-tap:focus > .hl {{ background: {PANEL}; }}
 .cb-row:hover {{ background: {PANEL}; }}
 @media (max-width: 640px) {{

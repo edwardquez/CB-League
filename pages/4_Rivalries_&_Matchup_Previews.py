@@ -390,27 +390,32 @@ def show_preview():
                     f"<span style='font-weight:{600 if n and w / n >= 0.55 else 400}'>{v}</span></div>")
     if not prs:
         prs = f"<p style='font-size:14px; color:{ui.MUTED}'>Solo players, so no pairs.</p>"
-    th = "".join(f"<th style='padding:8px; font-size:13px; color:{ui.MUTED}; font-weight:500; text-align:center'>{b}</th>" for b in TB)
+    th = "".join(f"<th style='padding:8px 2px; font-size:13px; color:{ui.MUTED}; font-weight:500; text-align:center; overflow:hidden; "
+                 f"text-overflow:ellipsis; white-space:nowrap'>{b}</th>" for b in TB)
     trs = ""
-    for a in TA:
+    for ri, a in enumerate(TA):
         tds = ""
-        for b in TB:
+        for ci, b in enumerate(TB):
             if a in team and b in team:
                 opp = team[a].notna() & team[b].notna() & (team[a] != team[b]); n = int(opp.sum()); w = int((win.loc[opp, a] == "W").sum())
             else:
                 n = w = 0
             if n:
                 fr = w / n; bg, fg = ui.shade(fr, n < 5)
-                tp = ui.tip(f"{a} vs {b}", f"{a} won {w} of {n} maps against {b}", "Small sample: under 5 maps" if n < 5 else "", below=True)
+                # bottom row opens above so the tip never hangs off the grid; edge columns anchor inward so it stays on a phone screen
+                tp = ui.tip(f"{a} vs {b}", f"{a} won {w} of {n} maps against {b}", "Small sample: under 5 maps" if n < 5 else "",
+                            align="r" if ci == len(TB) - 1 and len(TB) > 1 else ("l" if ci == 0 and len(TB) > 1 else ""), below=ri < len(TA) - 1)
                 tds += (f"<td {ui.TAP} style='text-align:center; padding:8px 4px; background:{bg}; color:{fg}'><span style='display:block; font-size:14px; "
                         f"font-weight:600'>{round(fr * 100)}%</span><span style='display:block; font-size:11px'>{n} maps</span>{tp}</td>")
             else:
                 tds += f"<td style='text-align:center; padding:8px 4px; background:{ui.TRACK}; color:{ui.MUTED}; font-size:12px'>Never opposed</td>"
-        trs += f"<tr><td style='padding:8px; font-weight:600; white-space:nowrap'>{a}</td>{tds}</tr>"
+        trs += f"<tr><td style='padding:8px 6px 8px 0; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{a}</td>{tds}</tr>"
     ui.html(f"<div style='{GRID2}; margin-top:36px'>"
             f"<section>{label('History of these lineups')}{hrows}{label('Teammate pairs', 24)}{prs}</section>"
-            f"<section>{label('Head to head · Team A player’s map win %')}<div style='overflow-x:auto; margin-top:8px'>"
-            f"<table style='width:100%; min-width:{100 + 100 * len(TB)}px; border-collapse:separate; border-spacing:3px; font-size:14px'>"
+            # no scroll box: fixed, even columns always fit, so hover tips are never clipped and no scrollbars appear
+            f"<section>{label('Head to head · Team A player’s map win %')}<div style='margin-top:8px'>"
+            f"<table style='width:100%; table-layout:fixed; border-collapse:separate; border-spacing:3px; font-size:14px'>"
+            f"<colgroup><col style='width:72px'>{'<col>' * len(TB)}</colgroup>"
             f"<thead><tr><th></th>{th}</tr></thead><tbody>{trs}</tbody></table></div>"
             + ui.note("Darker means the Team A player usually wins that matchup. Faded: under 5 maps. Hover or tap a cell.", 6, 12) + "</section></div>")
 
