@@ -278,13 +278,18 @@ input::placeholder, textarea::placeholder {{ color: {c['muted']} !important; -we
 .cb-row:hover {{ background: {c['navon']}; }}
 @media (max-width: 640px) {{
   [data-testid="stMainBlockContainer"] {{ padding-top: 60px; padding-left: 16px; padding-right: 16px; }}
-  [data-testid="stHeader"]::after {{ content: "CB LEAGUE"; position: absolute; right: 16px; top: 0; height: 52px; display: flex; align-items: center;
+  [data-testid="stHeader"]::after {{ content: "CB LEAGUE"; position: absolute; left: 60px; top: 0; height: 52px; display: flex; align-items: center;
     font-size: 11px; font-weight: 600; letter-spacing: 2.5px; color: {c['ink']}; pointer-events: none; }}
   .st-key-cb_head [data-testid="stColumn"]:last-child {{ margin-top: 14px; }}
   .cb-kpi {{ padding: 14px 0 10px !important; }}
   .cb-kpi-n {{ font-size: 36px !important; }}
   .cb-h1 {{ font-size: 40px !important; }}
   .cb-h2 {{ font-size: 26px !important; }}
+  /* a section title with its control (mode buttons, a picker) beside it on a computer: on a phone the control drops
+     under the title, so the title gets the same breathing room as any other title above what follows it */
+  [data-testid="stHorizontalBlock"]:has(.cb-h2):has([data-testid="stButtonGroup"], [data-testid="stSelectbox"]):not(:has([data-testid="stHorizontalBlock"] .cb-h2)):not(:has(> [data-testid="stColumn"]:nth-child(3))) [data-testid="stMarkdownContainer"]:has(.cb-h2) {{
+    margin-bottom: 0 !important; padding-bottom: 2px; }}
+  .st-key-pv_outlook_row [data-testid="stMarkdownContainer"]:has(.cb-h2) {{ margin-bottom: 0 !important; padding-bottom: 10px !important; }}
 }}
 /* show-on-phone / show-on-computer helpers */
 @media (min-width: 641px) {{ .cb-onph {{ display: none !important; }} }}
