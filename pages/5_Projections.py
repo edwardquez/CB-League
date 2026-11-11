@@ -17,13 +17,13 @@ cfg = ts.get(season, {})
 V = data.version()
 
 ui.html(ui.note("What each player is likely to put up on a given map, based on how they have played there and in that mode. "
-                "Every projection comes from 20,000 simulated maps.", 0, 15))
+                "Every projection comes from 20,000 simulated maps.", 0, 15) + "<div style='height:12px'></div>")
 if e.empty:
     ui.html(ui.empty_box(f"Projections start after the first {cfg.get('name', '')} series",
                          "Early on they lean on each player's mode averages, marked Low confidence until more maps are played."))
     st.stop()
 
-LBL = {"kills": "Kills", "damage": "Damage", "hill_time": "Hill time", "first_bloods": "First bloods", "overloads": "Overloads"}
+LBL = {"kills": "Kills", "damage": "Damage", "hill_time": "Hill time", "first_bloods": "First Bloods", "overloads": "Overloads"}
 MODEN = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}
 MODES = {"HP": "Hardpoint", "SND": "SnD", "OVL": "Overload", "HJ": "Hijack"}
 STEP = {"kills": 1, "first_bloods": 1, "overloads": 1, "damage": 100, "hill_time": 5}
@@ -77,7 +77,7 @@ active = active or [m for m in played if m not in retired]
 retired = retired + [m for m in played if m not in active and m not in retired]
 with c3:
     mp = st.selectbox("Map", active + retired + ["ALL"], key=f"pj_map_{mode}",
-                      format_func=lambda m: "Any map (mode average)" if m == "ALL" else m + (" (retired)" if m in retired else ""))
+                      format_func=lambda m: "Any Map (Mode Average)" if m == "ALL" else m + (" (retired)" if m in retired else ""))
 any_map = mp == "ALL"
 R = proj(tid, pl, mode, None if any_map else mp, V)
 scope = MODEN[mode] if any_map else f"{mp} {MODES[mode]}"
@@ -108,7 +108,7 @@ else:
             span = max(d1 - d0, 1)
             P = lambda v: max(0, min(1, (v - d0) / span)) * 100  # noqa: E731
             conf = conf_of(r["nmo"])
-            chip_bg, chip_fg, chip_b = {"High": (ui.BLUE, "#F2F4F2", ui.BLUE), "Medium": (ui.STEEL, "#F2F4F2", ui.STEEL),
+            chip_bg, chip_fg, chip_b = {"High": (ui.BLUE, ui.ON, ui.BLUE), "Medium": (ui.STEEL, ui.ON, ui.STEEL),
                                         "Low": ("transparent", ui.SLATE, ui.STEEL)}[conf]
             if any_map:
                 basis = f"From {pl}’s {r['nmo']} {MODEN[mode]} map{'s' if r['nmo'] != 1 else ''}."
@@ -158,26 +158,30 @@ rows.sort(key=lambda x: -x[1]["kills"]["e"])
 body = []
 for p, r in rows:
     n = r["kills"]["nmo"]; c = conf_of(n)
-    cells = [{"v": p, "w": 600 if p == pl else 500, "bg": ui.PANEL if p == pl else "transparent"}]
+    ctxt = f"{c} · " + (f"{n} maps" if any_map else f"{r['kills']['nm']} here, {n} total")
+    cells = [{"v": f"{p}<span class='cb-onph' style='display:block; font-size:11px; font-weight:400; color:{ui.MUTED}; margin-top:2px; white-space:normal'>{ctxt}</span>",
+              "w": 600 if p == pl else 500, "bg": ui.PANEL if p == pl else "transparent"}]
     for s in stats:
         if s in r:
             cells.append({"v": f"{fmt_e(s, r[s]['e'])}<br><span style='font-size:11px; color:{ui.MUTED}'>{fmt_v(s, r[s]['lo'])}–{fmt_v(s, r[s]['hi'])}</span>",
                           "bg": ui.PANEL if p == pl else "transparent"})
         else:
             cells.append("—")
-    cells.append({"v": f"{c} · " + (f"{n} maps" if any_map else f"{r['kills']['nm']} here, {n} total"),
+    cells.append({"v": ctxt, "cls": "cb-ondk",
                   "fg": ui.MUTED if c == "Low" else ui.INK, "w": 600 if c == "High" else 400, "bg": ui.PANEL if p == pl else "transparent"})
     body.append(cells)
-h1, h2 = st.columns([3, 1], vertical_alignment="bottom")
+ui.html("<div style='height:56px'></div>")
+h1, h2 = st.columns([3, 1], vertical_alignment="center")
 with h1:
-    ui.html(f"<div role='heading' class='cb-h2' style='font-weight:300; font-size:34px; margin-top:64px'>Everyone on {scope}</div>")
-with h2:
+    ui.html(f"<div role='heading' class='cb-h2' style='font-weight:300; font-size:34px; margin:0'>Everyone on {scope}</div>")
+with h2, st.container(horizontal=True, horizontal_alignment="right"):
     csv = pd.DataFrame([{"player": p, **{f"{s}_{k}": round(r[s][k], 2) for s in stats if s in r for k in ("e", "lo", "hi")}} for p, r in rows])
     st.download_button("Download CSV", csv.to_csv(index=False).encode(), f"projections_{season}_{mode}_{mp}.csv", "text/csv")
 ui.html(f"<div style='border-top:2px solid {ui.INK}; margin-top:4px'></div>"
         + ui.note("Expected value with the likely range underneath. Sorted by expected kills. Your selected player is highlighted.", 10, 13)
         + "<div style='margin-top:4px'>"
-        + ui.table([("Player", "left")] + [(LBL[s], "right") for s in stats] + [("Confidence", "right")], body, min_width=560, cell_pad="10px 8px") + "</div>")
+        + ui.table([("Player", "left")] + [(LBL[s], "right") for s in stats] + [("Confidence", "left", "cb-ondk")], body, min_width=560, cell_pad="10px 8px", cls="pj-tb")
+        + "<style>@media (max-width: 640px) { .pj-tb table { min-width: 0 !important; } .pj-tb td, .pj-tb th { padding-left: 5px !important; padding-right: 5px !important; } }</style>" + "</div>")
 
 # ------------------------------------------------------------- track record
 bt = backtest(tid, V)
@@ -198,7 +202,7 @@ with c2:
                        index=(["ALL"] + players).index(pl))
 with c3:
     btv = st.segmented_control("View", ["pt", "rng"], default="pt", key="bt_view",
-                               format_func={"pt": "Projected vs actual", "rng": "Show ranges"}.get) or "pt"
+                               format_func={"pt": "Projected vs Actual", "rng": "Show Ranges"}.get) or "pt"
 is_pt = btv == "pt"
 with intro:
     ui.html(ui.note("We replayed the second half of the season. Before each map the model only saw earlier games. "
@@ -265,7 +269,7 @@ for s in bstats:
     rows += (f"<div style='display:grid; grid-template-columns:110px minmax(0,1fr) 44px; align-items:center; gap:10px; min-height:32px'>"
              f"<span style='font-size:14px'>{LBL[s]}</span><div style='position:relative; height:10px; background:{ui.TRACK}'>"
              f"<div style='height:10px; width:{v}%; background:{ui.BLUE}'></div><div style='position:absolute; top:-3px; bottom:-3px; left:80%; width:2px; "
-             f"background:{ui.INK}'></div></div><span style='text-align:right; font-size:14px; font-weight:500'>{v}%</span></div>")
+             f"background:{ui.INK}'></div></div><span class='cbn' style='text-align:right; font-size:14px; font-weight:500'>{v}%</span></div>")
 ui.html(ui.label("Landed in the likely range · every player", margin_top=36) + f"<div style='margin-top:10px; max-width:640px'>{rows}</div>"
         + ui.note("The black tick marks 8 in 10. First bloods and overloads sit a bit above it because whole-number ranges can't stop at exactly 8 in 10.", 6, 12))
 

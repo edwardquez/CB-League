@@ -26,6 +26,8 @@ page.start("Tournaments")
 ss = st.session_state
 TEAMC = [ui.BLUE, "#8C5A3C", "#4F6B3A", "#6B4E71", "#2E6F6A", "#9A7B3C", "#7A4450", "#3F5A7A",
          "#5A6B2E", "#7B5A8C", "#2F5D50", "#8A6A2F", "#5C4A3F", "#3E6B7A", "#6E3F55", "#4A4F7A"]
+if ui.is_dark():   # on the dark page the team colours are lifted so they read, and take dark text
+    TEAMC = [TEAMC[0]] + [ui.mix(c, "#FFFFFF", .42) for c in TEAMC[1:]]
 MINMAPS = 3                          # fewer maps than this: shown in grey, not shaded or ranked
 CARD_H, GAP = 90, 22                 # bracket card height and the space between two first-round cards
 MODEN, SHORT = me.MODEN, me.SHORT
@@ -268,10 +270,11 @@ def card_html(tour, m, sel, h=CARD_H, extra=""):
         fg = ui.MUTED if (lost or not known or tid == T.BYE) else ui.INK
         fs = 14 if known else 13
         sw = f"<span style='width:4px; align-self:stretch; background:{tour.color.get(tid, 'transparent')}'></span>"
-        rows.append(f"<div style='display:grid; grid-template-columns:4px 20px minmax(0,1fr) 26px; align-items:center; gap:6px; height:33px; "
+        win_row = " class='cb-tnwin'" if won and m.get("stage", "").endswith(("GF", "GR")) else ""
+        rows.append(f"<div{win_row} style='display:grid; grid-template-columns:4px 20px minmax(0,1fr) 26px; align-items:center; gap:6px; height:33px; "
                     f"padding:0 10px 0 0; border-top:{'1px solid ' + ui.RULE if i else '0'}'>{sw}<span style='font-size:11px; color:{ui.MUTED}'>{seed}</span>"
-                    f"<span title='{escape(nm)}' style='font-size:{fs}px; font-weight:{600 if won else 400}; color:{fg}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{escape(nm)}</span>"
-                    f"<span style='text-align:right; font-size:15px; font-weight:{600 if won else 400}; color:{fg}'>{sc}</span></div>")
+                    f"<span title='{escape(nm)}' class='{'tnname' if known and tid != T.BYE else ''}' style='font-size:{fs}px; font-weight:{600 if won else 400}; color:{fg}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{escape(nm)}</span>"
+                    f"<span class='cbn' style='text-align:right; font-size:15px; font-weight:{600 if won else 400}; color:{fg}'>{sc}</span></div>")
     foot_l = {"live": f"LIVE · map {r['wa'] + r['wb'] + 1} next", "done": "Final" + (" · winner only" if r["manual"] else ""), "ready": "Ready",
               "waiting": "Waiting", "bye": "Bye", "skipped": "Not Needed"}[st_]
     if m.get("if_needed") and st_ in ("waiting", "ready"):
@@ -280,10 +283,14 @@ def card_html(tour, m, sel, h=CARD_H, extra=""):
     edge = ui.BLUE if live else ui.RULE
     ring = f"outline:2px solid {ui.INK}; outline-offset:2px;" if sel else ""
     fb, ff = (ui.BLUE, ui.LIGHT) if live else ("transparent", ui.MUTED)
-    return (f"<div class='tn-card' style='position:relative; height:{h}px; box-sizing:border-box; border:1px {'dashed' if dashed else 'solid'} {edge}; {ring}"
+    # the bracket plays in stage by stage: winners round 1 first, then each later round, the losers side, the final
+    sg = m.get("stage", ""); rd = int(m.get("round", 1) or 1)
+    st_n = 3 if sg.endswith("GF") else 4 if sg.endswith("GR") else rd if sg.endswith("L") else rd - 1
+    return (f"<div class='cb-tnst{' tnl' if sg.endswith('L') else ''}' style='--st:{st_n}'>"
+            f"<div class='tn-card' style='position:relative; height:{h}px; box-sizing:border-box; border:1px {'dashed' if dashed else 'solid'} {edge}; {ring}"
             f"background:{'transparent' if dashed else ui.PANEL}; font-family:{ui.FONT}'>{''.join(rows)}"
             f"<div style='display:flex; justify-content:space-between; align-items:center; height:{h - 68}px; padding:0 10px; background:{fb}; "
-            f"font-size:11px; color:{ff}; font-weight:{600 if live else 400}'><span>{foot_l}</span><span>Bo{m['bo']}</span></div>{extra}</div>")
+            f"font-size:11px; color:{ff}; font-weight:{600 if live else 400}'><span>{foot_l}</span><span>Bo{m['bo']}</span></div>{extra}</div></div>")
 
 
 def card(tour, m, extra=""):
@@ -606,7 +613,7 @@ def match_panel(tour):
                     with st.popover("Record the Winner Only, No Stats"):
                         ui.html(ui.note("For a series you don't want to enter stats for. Any maps already entered for it are kept.", 0, 13))
                         for side, nm in (("a", A), ("b", B)):
-                            if st.button(f"{nm} won", key=f"tn_man_{side}", width="stretch"):
+                            if st.button(f"{nm} Won", key=f"tn_man_{side}", width="stretch"):
                                 t.setdefault("manual", {})[m["id"]] = side
                                 data.save_tournament(t)
                                 ss[key] = None  # show the next match to play
@@ -861,7 +868,7 @@ def tour_engine():
 def stats_tab(tour):
     t = tour.t
     scope = st.segmented_control("Scope", ["this", "all"], default="this", key="tn_scope", label_visibility="collapsed",
-                                 format_func={"this": "This tournament", "all": "All tournaments"}.get) or "this"
+                                 format_func={"this": "This Tournament", "all": "All Tournaments"}.get) or "this"
     ui.html(ui.note("Tournament stats, kept apart from the regular league numbers.", 8, 14))
     docs = [t] if scope == "this" else TD["tournaments"]
     tids = {d["_id"] for d in docs}
@@ -909,7 +916,7 @@ def stats_tab(tour):
                 champs[p] = champs.get(p, 0) + 1
         fin = sum(1 for d in TD["tournaments"] if FIN.get(d["_id"]))
         top = max(champs.values()) if champs else 0
-        kp = [(str(len(TD["tournaments"])), "Tournaments", f"{fin} finished · {len(TD['tournaments']) - fin} live"), (str(maps_here), "Maps played", "All tournaments"),
+        kp = [(str(len(TD["tournaments"])), "Tournaments", f"{fin} finished · {len(TD['tournaments']) - fin} live"), (str(maps_here), "Maps played", "All Tournaments"),
               (f"{q.kd.max():.2f}", "Best K/D", best_kd), (str(top), "Most titles", ", ".join(p for p, n in champs.items() if n == top) if top else "—")]
     cells = "".join(f"<div style='padding:18px 0 14px'><div style='font-weight:300; font-size:38px; line-height:1'>{escape(v)}</div>"
                     f"<div style='font-size:13px; color:{ui.MUTED}; margin-top:6px'>{escape(l)}</div><div style='font-size:14px; font-weight:600; margin-top:6px'>{escape(str(w))}</div></div>"
@@ -923,7 +930,7 @@ def stats_tab(tour):
 
         def sh(v, col, low=False):
             if not ok:
-                return {"v": v, "bg": "#C9D1CC", "fg": ui.MUTED}
+                return {"v": v, "bg": ui.NAVON, "fg": ui.MUTED}
             bg, fg = ui.tint(x[col], list(qual[col]), low)
             return {"v": v, "bg": bg, "fg": fg, "w": 500}
         row = [{"v": escape(name), "w": 600}, {"v": escape(x.teams), "fg": ui.MUTED}, str(int(x.maps)), f"{int(x.w)}-{int(x.maps - x.w)}",
@@ -931,9 +938,9 @@ def stats_tab(tour):
         if mar is not None:
             row.append(ui.sg(mar.get(name), 2))
         body.append(row)
-    cols = [("Player", "left"), ("Team", "left"), ("Maps", "right"), ("Maps W-L", "right"), ("K/D", "right"), ("Kills / map", "right"),
-            ("Damage / map", "right"), ("Hill / map", "right"), ("First bloods", "right")] + ([("MAR / map", "right")] if mar is not None else [])
-    ui.html(ui.h2("Players", margin_top=36, right=f"<span style='font-size:12px; color:{ui.MUTED}'>{escape(t['name'] if scope == 'this' else 'All tournaments')}</span>")
+    cols = [("Player", "left"), ("Team", "left"), ("Maps", "right"), ("Maps W-L", "right"), ("K/D", "right"), ("Kills / Map", "right"),
+            ("Damage / Map", "right"), ("Hill / Map", "right"), ("First Bloods", "right")] + ([("MAR / Map", "right")] if mar is not None else [])
+    ui.html(ui.h2("Players", margin_top=36, right=f"<span style='font-size:12px; color:{ui.MUTED}'>{escape(t['name'] if scope == 'this' else 'All Tournaments')}</span>")
             + ui.table(cols, body, min_width=760)
             + f"<div style='display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:10px; font-size:12px; color:{ui.MUTED}'>"
             + f"<span>Shaded: lowest → highest</span><span>Grey: under {MINMAPS} maps, not shaded</span></div>")
@@ -962,7 +969,7 @@ def stats_tab(tour):
                                         {"v": escape(fin + ('' if scope == 'this' else ' · ' + d['name'])), "fg": ui.MUTED}]))
     trows.sort(key=lambda z: (-z[0], -z[1]))
     ui.html(ui.h2("Teams", margin_top=36) + ui.table([("Team", "left"), ("Series W-L", "right"), ("Maps W-L", "right"), ("K/D", "right"),
-                                                      ("Kills / map", "right"), ("Finish", "right")], [z[2] for z in trows], min_width=560))
+                                                      ("Kills / Map", "right"), ("Finish", "right")], [z[2] for z in trows], min_width=560))
 
 
 # ===================================================================== map entry view
@@ -995,7 +1002,7 @@ def entry_view():
         back()
 
     ui.html("<style>[data-testid='stMainBlockContainer'] { max-width: 760px; }</style>")
-    if st.button("‹ Back to the bracket", type="tertiary", key="tn_back"):
+    if st.button("‹ Back to the Bracket", type="tertiary", key="tn_back"):
         back(); st.rerun()
     so_far = " · ".join(f"Map {x['map_no']}: {SHORT.get(x['mode'], x['mode'])} on {escape(x['map'])}, won by {escape(A['name'] if x['winner'] == 'A' else B['name'])}" for x in r["maps"])
     with st.container(key="tn_head"):
@@ -1053,7 +1060,13 @@ def setup_view():
     names_all = sorted(names_all, key=lambda p: (-R8.get(p, 0), p))
     rating = lambda p: R8.get(p, 1500)  # noqa: E731  (no games yet: the 1500 average)
 
-    ui.html("<style>[data-testid='stMainBlockContainer'] { max-width: 820px; }</style>")
+    ui.html("<style>[data-testid='stMainBlockContainer'] { max-width: 820px; }"
+            ".tn-sec { font-weight: 300; font-size: 24px; margin-top: 32px; padding-bottom: 14px; }"
+            ".st-key-skfull_tnsize [data-testid='stWidgetLabel'] { margin-bottom: 8px; }"
+            # the drag boxes live in their own frame: matching colour schemes keeps that frame see-through in dark mode
+            "iframe[title*='sortable'] { color-scheme: normal; }"
+            ".tn-tgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }"
+            "@media (max-width: 520px) { .tn-tgrid { grid-template-columns: minmax(0, 1fr); } }</style>")
     a, b = st.columns([4, 1], vertical_alignment="bottom")
     with a:
         ui.html(ui.h2("New Tournament", margin_top=12, rule=False))
@@ -1064,7 +1077,7 @@ def setup_view():
             + ui.note("Practice mode works here too, so a test bracket never gets saved." if not PRACTICE else "Practice mode: this tournament stays on the private copy.", 12, 14))
 
     # 1. basics
-    ui.html("<div style='font-weight:300; font-size:24px; margin-top:28px'>1. Basics</div>")
+    ui.html("<div class='tn-sec'>1. Basics</div>")
     c1, c2 = st.columns([2, 1])
     with c1:
         S["name"] = me.field(st.text_input, "Name", "tn_s_name", S, "name", "", placeholder="e.g. Winter 2v2 Cup").strip()
@@ -1072,7 +1085,6 @@ def setup_view():
         S["date"] = me.field(st.date_input, "Date", "tn_s_date", S, "date", dt.date.today(), format="YYYY-MM-DD")
     S["title"] = me.field(st.selectbox, "Game", "tn_s_title", S, "title", cur_title, options=tids,
                           format_func=lambda x: f"{ts[x]['name']} ({ts[x].get('year', '')})" + (" · current" if x == cur_title else ""))
-    ui.html(ui.note("The game sets the map pool for map entry and the ratings used for seeding.", 0, 12))
     with st.container(key="skfull_tnsize"):
         size = me.field(st.segmented_control, "Team Size", "tn_s_size", S, "size", 2, options=[1, 2, 3, 4], format_func=lambda z: f"{z}v{z}") or 2
     if size != S.get("_size_prev"):
@@ -1082,7 +1094,7 @@ def setup_view():
     S["size"] = size
 
     # 2. format
-    ui.html("<div style='font-weight:300; font-size:24px; margin-top:32px'>2. Format</div>")
+    ui.html("<div class='tn-sec'>2. Format</div>")
     fl = list(T.FORMATS)
     for i in range(0, len(fl), 2):
         cols = st.columns(2)
@@ -1090,7 +1102,7 @@ def setup_view():
             on = S["fmt"] == f
             with c:
                 with st.container(key=f"tnfmt_{f}", gap=None):
-                    ui.html(f"<div style='padding:14px 14px 16px; min-height:96px; box-sizing:border-box; background:{ui.INK if on else ui.PANEL}; "
+                    ui.html(f"<div style='padding:14px 14px 16px; min-height:96px; box-sizing:border-box; background:{ui.INK if on else ui.WASH}; "
                             f"color:{ui.PANEL if on else ui.INK}; border:1px solid {ui.INK if on else ui.RULE}'>"
                             f"<div style='font-size:15px; font-weight:600'>{escape(T.FORMATS[f][0])}</div>"
                             f"<div style='font-size:12px; line-height:1.45; margin-top:6px; color:{ui.RULE if on else ui.MUTED}'>{escape(T.FORMATS[f][1])}</div></div>")
@@ -1110,7 +1122,7 @@ def setup_view():
             O[k] = vals[0] if v is None else v
 
     # 3. teams
-    ui.html("<div style='font-weight:300; font-size:24px; margin-top:32px'>3. Teams</div>")
+    ui.html("<div class='tn-sec'>3. Teams</div>")
     picked = [p for p in names_all if p in S["picked"]]
     n_teams = len(picked) // size
     # teams (as lists of players) for the current build
@@ -1127,7 +1139,7 @@ def setup_view():
     pool = [p for p in picked if p not in placed]
     tcol = {p: TEAMC[i % len(TEAMC)] for i, g in enumerate(groups) for p in g}
 
-    ui.html(f"<div style='font-size:13px; margin-top:12px'>Who's Playing · {len(picked)} players</div>")
+    ui.html(f"<div style='font-size:13px; margin-top:12px; padding-bottom:8px'>Who's Playing · {len(picked)} players</div>")
     css = ""
     with st.container(horizontal=True, gap="small", key="tn_roster"):
         for i, p in enumerate(names_all):
@@ -1145,10 +1157,10 @@ def setup_view():
                 css += f".st-key-tn_rp_{i} button {{ color:{ui.MUTED}; }}"
     ui.html(f"<style>{css}</style>" + ui.note("Tap to add or take someone out. Once they're on a team, they take that team's color and number.", 6, 12))
 
-    ui.html("<div style='font-size:13px; margin-top:18px'>Make the Teams</div>")
+    ui.html("<div style='font-size:13px; margin-top:18px; padding-bottom:8px'>Make the Teams</div>")
     with st.container(key="skfull_tnbuild"):
-        nb = st.segmented_control("Make the teams", ["hand", "random", "balanced"], default=build, key="tn_s_build", label_visibility="collapsed",
-                                  format_func={"hand": "By hand", "random": "Random draw", "balanced": "Balanced by rating"}.get) or build
+        nb = st.segmented_control("Make the Teams", ["hand", "random", "balanced"], default=build, key="tn_s_build", label_visibility="collapsed",
+                                  format_func={"hand": "By Hand", "random": "Random Draw", "balanced": "Balanced by Rating"}.get) or build
     if nb != build:
         S["build"] = nb; S["order"] = None; st.rerun()
     ui.html(ui.note({"hand": "Drag players onto a team. On a phone, press and hold for a moment, then drag. Or use Tap instead below.",
@@ -1165,18 +1177,20 @@ def setup_view():
         items = [{"header": heads[0], "items": pool}] + [{"header": heads[i + 1], "items": g} for i, g in enumerate(groups)]
         # fixed heights: a box that grows or shrinks mid-drag makes the drop target flip back and forth,
         # which is what trips React's "maximum update depth" error (#185)
-        pool_h = 44 + 46 * math.ceil(max(len(picked), 1) / 3)
+        pool_h = 44 + 46 * math.ceil(max(len(picked), 1) / 4)
         team_h = 44 + 46 * math.ceil((size + 1) / 2)
         sty = (f"@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600&display=swap');"
+               f":root, html, body {{ color-scheme:normal; background:transparent !important; }}"
                f".sortable-component {{ border:0; background:transparent; padding:0; font-family:'Hanken Grotesk', sans-serif; display:grid; "
-               f"grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }}"
-               f".sortable-container {{ background:{ui.PANEL}; border:1px solid {ui.RULE}; border-radius:0; margin:0; height:{team_h}px; box-sizing:border-box; "
+               f"grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }}"
+               f"@media (max-width:520px) {{ .sortable-component {{ grid-template-columns:minmax(0, 1fr); }} }}"
+               f".sortable-container {{ background:{ui.WASH}; border:1px solid {ui.RULE}; border-radius:0; margin:0; height:{team_h}px; box-sizing:border-box; "
                f"padding:10px 12px; overflow:hidden; }}"
                f".sortable-container:nth-child(2) {{ grid-column:1 / -1; border:1px dashed {ui.STEEL}; height:{pool_h}px; }}"
                f".sortable-container-header {{ background:transparent; color:{ui.MUTED}; font-size:12px; font-weight:600; letter-spacing:1.4px; text-transform:uppercase; padding:0 0 8px; }}"
                f".sortable-container-body {{ background:transparent; display:flex; flex-wrap:wrap; gap:6px; min-height:40px; padding:0; }}"
                f".sortable-item, .sortable-item:hover {{ margin:0; border-radius:0; font-size:14px; padding:9px 14px; touch-action:manipulation; user-select:none; "
-               f"background:#F2F4F2; color:{ui.INK}; border:1px solid {ui.INK}; }}"
+               f"background:{ui.BG}; color:{ui.INK}; border:1px solid {ui.INK}; }}"
                f".sortable-item.dragging {{ opacity:.9; }}"
                # the add-on puts a <style> first, so the "Not on a team yet" box is child 2 and team i is child i + 3
                + "".join(f".sortable-container:nth-child({i + 3}) .sortable-container-header {{ color:{TEAMC[i % len(TEAMC)]}; }}"
@@ -1196,7 +1210,7 @@ def setup_view():
         if st.button("Reset Drag Boxes", type="tertiary", key="tn_drag_reset",
                      help="If the drag boxes ever show an error, this reloads them. Your teams are kept."):
             S["ver"] += 1; st.rerun()
-        with st.expander("Tap instead"):
+        with st.expander("Tap Instead"):
             act = st.segmented_control("Add to", list(range(n_teams)), default=0, format_func=lambda i: f"Team {i + 1}", key="tn_tap_team") or 0
             ui.html(ui.note(f"Tap a player to put them on Team {act + 1}; tap again to take them off.", 0, 12))
             tcss = "".join(f".st-key-tn_tap_{i} button {{ background:{TEAMC[S['hand'][p] % len(TEAMC)]} !important; border-color:{TEAMC[S['hand'][p] % len(TEAMC)]} !important; color:{ui.LIGHT} !important; }}"
@@ -1215,14 +1229,14 @@ def setup_view():
                     st.button(p + (f" · Team {on_t + 1}" if on_t is not None else ""), key=f"tn_tap_{pi}", on_click=tap,
                               type="primary" if on_t is not None else "secondary")
     elif n_teams:
-        cards = "".join(f"<div style='position:relative; padding:12px 14px 12px 20px; background:{ui.PANEL}; border:1px solid {ui.RULE}'>"
+        cards = "".join(f"<div style='position:relative; padding:12px 14px 12px 20px; background:{ui.WASH}; border:1px solid {ui.RULE}'>"
                         f"<span style='position:absolute; left:0; top:0; bottom:0; width:6px; background:{TEAMC[i % len(TEAMC)]}'></span>"
                         f"<div style='font-size:12px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:{TEAMC[i % len(TEAMC)]}'>Team {i + 1}</div>"
                         f"<div style='display:flex; flex-wrap:wrap; gap:6px; margin-top:8px'>"
                         + "".join(f"<span style='padding:7px 12px; background:{TEAMC[i % len(TEAMC)]}; color:{ui.LIGHT}; font-size:14px'>{escape(p)}</span>" for p in g)
                         + f"</div><div style='font-size:12px; color:{ui.MUTED}; margin-top:8px'>Avg rating {round(sum(rating(p) for p in g) / len(g))}</div></div>"
                         for i, g in enumerate(groups))
-        ui.html(f"<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin-top:12px'>{cards}</div>")
+        ui.html(f"<div class='tn-tgrid'>{cards}</div>")
         if build == "random":
             ui.html("<div style='height:14px'></div>")
             if st.button("Draw Again", key="tn_redraw"):
@@ -1240,10 +1254,10 @@ def setup_view():
                 S["names"][i] = st.text_input(f"Team {i + 1}", value=S["names"].get(i, ""), placeholder=" / ".join(groups[i]), key=f"tn_rn_{i}_{'-'.join(groups[i])}").strip()
 
     # 4. seeding
-    ui.html("<div style='font-weight:300; font-size:24px; margin-top:32px'>4. Seeding</div>")
+    ui.html("<div class='tn-sec'>4. Seeding</div>")
     with st.container(key="skfull_tnseed"):
         sm = st.segmented_control("Seeding", ["rating", "random", "manual"], default=S["seed"], key="tn_s_seed", label_visibility="collapsed",
-                                  format_func={"rating": "By rating", "random": "Random", "manual": "Set by hand"}.get) or S["seed"]
+                                  format_func={"rating": "By Rating", "random": "Random", "manual": "Set by Hand"}.get) or S["seed"]
     if sm != S["seed"]:
         S["seed"] = sm
         if sm == "random":
@@ -1260,7 +1274,7 @@ def setup_view():
         order = by_r
     ui.html(ui.note({"rating": "Highest average rating is the #1 seed. Seeds decide who plays who first and who gets byes.",
                      "random": "Seeds are drawn at random. Pick Random again to redraw.", "manual": "Use the arrows to put the teams in order."}[sm], 6, 12))
-    if sm == "random" and st.button("Redraw seeds", type="tertiary", key="tn_reseed"):
+    if sm == "random" and st.button("Redraw Seeds", type="tertiary", key="tn_reseed"):
         S["seed_shuffle"] += 1; st.rerun()
     for j, i in enumerate(order):
         with st.container(key=f"tn_seedrow_{j}"):
@@ -1280,7 +1294,7 @@ def setup_view():
                         st.button("↓", key=f"tn_dn_{j}", on_click=mv, kwargs={"j": j, "dd": 1}, disabled=j == len(order) - 1)
 
     # 5. match length
-    ui.html("<div style='font-weight:300; font-size:24px; margin-top:32px'>5. Match Length</div>")
+    ui.html("<div class='tn-sec'>5. Match Length</div>")
     L = S["len"]
     for k, lab in T.STAGES[fmt]:
         c1, c2 = st.columns([1, 1.6], vertical_alignment="center")
@@ -1344,13 +1358,13 @@ def setup_view():
     status = (f"<div style='margin-top:16px; padding:10px 12px; border-left:3px solid {ui.RUST}; background:{ui.LIGHT}; font-size:13px'>"
               + escape(why) + (f". {extra} player{'s' if extra > 1 else ''} left over: add or remove someone to even out the teams." if extra else ".") + "</div>"
               if why else ui.note("Ready to go. Results stay on this page, never the Series Log or regular stats.", 16, 13))
-    ui.html(f"<div style='margin-top:28px; padding:18px; background:{ui.PANEL}; border:1px solid {ui.RULE}'>"
+    ui.html(f"<div style='margin-top:28px; padding:18px; background:{ui.WASH}; border:1px solid {ui.RULE}'>"
             + ui.label("Summary")
             + f"<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:8px; margin-top:10px'>{tile_html}</div>"
             + (ui.label(round_lab, margin_top=20) + f"<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:8px; margin-top:10px'>{cards}</div>"
                if cards else "")
             + status + "</div>")
-    if st.button("Create tournament · draw the bracket", type="primary", width="stretch", disabled=not ok, key="tn_create"):
+    if st.button("Create Tournament · Draw the Bracket", type="primary", width="stretch", disabled=not ok, key="tn_create"):
         doc = {"_id": data.next_tournament_id(), "name": S["name"], "date": pd.Timestamp(S["date"]).date().isoformat(), "title": S["title"],
                "size": size, "format": fmt, "opts": o, "lengths": {**T.DEFAULT_LEN, **L}, "teams": teams, "manual": {},
                "created": dt.datetime.now().isoformat(timespec="seconds"), "finished": False}
@@ -1387,7 +1401,7 @@ else:
     stats_tab(tour)
 if CAN_EDIT:
     ui.html("<div style='height:40px'></div>")
-    with st.expander("Delete this tournament"):
+    with st.expander("Delete This Tournament"):
         ui.html(ui.note(f"Deletes {escape(doc['name'])}, its bracket and every map and stat entered for it. This can't be undone.", 0, 13))
         if st.button(f"Delete {doc['name']}", key="tn_delete"):
             data.delete_tournament(doc["_id"])

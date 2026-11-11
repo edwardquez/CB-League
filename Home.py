@@ -9,7 +9,7 @@ page.start("Home")
 e = data.engine(None)
 ts = data.titles()
 
-ui.html(ui.eyebrow("All time · every title") + ui.h1("CB League Overview"))
+ui.html(ui.eyebrow("All time · every title") + ui.h1("CB League"))
 
 if e.empty:
     ui.html(ui.empty_box("No games yet", "Stats appear after the first series is entered in the Scorekeeper."))
@@ -23,6 +23,26 @@ q = st_[st_.n >= MIN]
 mvps = pd.Series([v[0] for v in e.series_mvps().values()]).value_counts()
 top_mvp = mvps[mvps == mvps.max()].index.tolist()
 
+# latest results, scrolling past under the title
+rec_ = s.sort_values(["date", "series_no"], ascending=False).head(6)
+
+
+def _tick(r):
+    a, b = ", ".join(r.team_a), ", ".join(r.team_b)
+    wa, wb = int(r.wins_a), int(r.wins_b)
+    return (f"<span style='display:inline-flex; align-items:baseline; gap:10px; padding:0 22px; white-space:nowrap; font-size:13px; border-right:1px solid {ui.RULE}'>"
+            f"<span style='color:{ui.MUTED}'>S{int(r.series_no)} · {r.date.strftime('%b')} {r.date.day}</span>"
+            f"<span style='color:{ui.INK if wa > wb else ui.MUTED}; font-weight:{600 if wa > wb else 400}'>{a}</span>"
+            f"<span style='display:inline-block; padding:1px 7px; background:{ui.mix(ui.BG, ui.BLUE, .18)}; color:{ui.BLUE}; font-weight:600'>{wa}–{wb}</span>"
+            f"<span style='color:{ui.INK if wb > wa else ui.MUTED}; font-weight:{600 if wb > wa else 400}'>{b}</span></span>")
+
+
+row_ = "".join(_tick(r) for r in rec_.itertuples())
+ui.html(f"<div role='marquee' aria-label='Latest results' style='margin-top:32px; border-top:2px solid {ui.INK}; border-bottom:1px solid {ui.RULE}; "
+        f"height:40px; overflow:hidden; display:flex; align-items:center'><span class='cb-lab' style='flex:none; padding-right:14px; font-size:12px; font-weight:600; "
+        f"letter-spacing:1.6px; text-transform:uppercase; color:{ui.MUTED}'>Latest</span>"
+        f"<div style='overflow:hidden; flex:1; -webkit-mask-image:linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent)'>"
+        f"<div class='cb-strip'>{row_}{row_}</div></div></div>")
 ui.html(ui.label("League at a glance", margin_top=40) + ui.kpis([
     (str(s.title.nunique()), "Titles tracked"), (str(len(s)), "Series played"), (str(len(m)), "Maps played"),
     (str(pm.player.nunique()), "Players"), (f"{int(pm.kills.sum()):,}", "Kills"),
@@ -35,22 +55,22 @@ def lead(col, fmt, label, src=None, color=ui.INK):
     if t.empty or col not in t or t[col].dropna().empty:
         return ""
     p = t[col].idxmax()
-    return (f"<div style='padding:18px 0; border-bottom:1px solid {ui.RULE}'><div style='font-weight:300; font-size:34px; "
+    return (f"<div class='cb-rise' style='padding:18px 0; border-bottom:1px solid {ui.RULE}'><div style='font-weight:300; font-size:34px; "
             f"line-height:1; color:{color}'>{fmt(t.loc[p, col])}</div><div style='font-size:13px; color:{ui.MUTED}; margin-top:6px'>"
             f"{label}</div><div style='font-size:15px; font-weight:600; margin-top:8px'>{p}</div></div>")
 
 
 hp = e.standings("HP"); hp = hp[hp.n >= 5]
 snd = e.standings("SND"); ovl = e.standings("OVL")
-cells = [lead("mar", ui.sg, "MAR", color=ui.BLUE), lead("kd", lambda v: f"{v:.2f}", "K/D"), lead("wp", ui.pct, "Win %"),
+cells = [lead("mar", lambda v: ui.sg(v, 2), "MAR", color=ui.BLUE), lead("kd", lambda v: f"{v:.2f}", "K/D"), lead("wp", ui.pct, "Win %"),
          lead("dmg", ui.n0, "Damage per map"), lead("hill", ui.mmss, "Hill time per map", hp),
-         lead("fb", lambda v: f"{int(v)}", "First bloods", snd), lead("ovl", lambda v: f"{int(v)}", "Overloads", ovl)]
-cells.append(f"<div style='padding:18px 0; border-bottom:1px solid {ui.RULE}'><div style='font-weight:300; font-size:34px; line-height:1'>"
+         lead("fb", lambda v: f"{int(v)}", "First Bloods", snd), lead("ovl", lambda v: f"{int(v)}", "Overloads", ovl)]
+cells.append(f"<div class='cb-rise' style='padding:18px 0; border-bottom:1px solid {ui.RULE}'><div style='font-weight:300; font-size:34px; line-height:1'>"
              f"{int(mvps.max())}</div><div style='font-size:13px; color:{ui.MUTED}; margin-top:6px'>Series MVPs</div>"
              f"<div style='font-size:15px; font-weight:600; margin-top:8px'>{' &amp; '.join(top_mvp)}</div></div>")
 ui.html("<div style='margin-top:40px; display:flex; justify-content:space-between; align-items:baseline; gap:4px 12px; flex-wrap:wrap'>"
         + ui.label("League leaders") + f"<span style='font-size:12px; color:{ui.MUTED}'>Career · min. {MIN} maps</span></div>"
-        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(max(200px, 22%), 1fr)); column-gap:24px; "
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(max(150px, 22%), 1fr)); column-gap:24px; "
         f"border-top:2px solid {ui.INK}; margin-top:12px'>{''.join(cells)}</div>")
 
 MS = {"HP": "HP", "SND": "SnD", "OVL": "OVL", "HJ": "Hijack"}
@@ -81,7 +101,8 @@ for tid in sorted(ts, key=lambda t: -ts[t].get("order", 0)):
 mc = m.groupby("mode").size()
 mc = mc.reindex([k for k in ["HP", "SND", "OVL", "HJ"] if k in mc.index] + [k for k in mc.index if k not in ("HP", "SND", "OVL", "HJ")])
 cols = {"HP": ui.INK, "SND": ui.BLUE, "OVL": ui.STEEL, "HJ": ui.SLATE}
-bar = "".join(f"<div style='flex:{mc[k]} 1 0; background:{cols.get(k, ui.STEEL)}'></div>" for k in mc.index)
+bar = "".join(f"<div class='cb-grow' style='flex:{mc[k]} 1 0; background:{cols.get(k, ui.STEEL)}; animation-delay:{.12 * i:.2f}s'></div>"
+              for i, k in enumerate(mc.index))
 lab = "".join(f"<span>{ {'HP': 'Hardpoint', 'SND': 'SnD', 'OVL': 'Overload', 'HJ': 'Hijack'}.get(k, k)} {mc[k]}</span>" for k in mc.index)
 ui.html("<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(max(280px, 45%), 1fr)); gap:40px 48px; margin-top:40px'>"
         f"<section>{ui.label('Single-map records', rule=False)}<div style='border-top:2px solid {ui.INK}; margin-top:12px'>"

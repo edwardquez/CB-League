@@ -1,29 +1,30 @@
-# Theme for the whole app (Mist palette, Hanken Grotesk). Streamlit reads this
+# Base theme (Harbour Sunrise, the light mode; Hanken Grotesk). The Dark mode switch in the sidebar
+# swaps in Pastel Night Shade with CSS (cbl/ui/styles.py). Streamlit reads this
 # file automatically, locally and on Streamlit Cloud.
 
 [theme]
 base = "light"
-primaryColor = "#124E66"
-backgroundColor = "#D3D9D4"
-secondaryBackgroundColor = "#E2E7E3"
-textColor = "#212A31"
-linkColor = "#124E66"
-redColor = "#A8543C"
-blueColor = "#124E66"
-font = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&display=swap"
-headingFont = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&display=swap"
+primaryColor = "#1C4A5E"
+backgroundColor = "#DCE3E2"
+secondaryBackgroundColor = "#E9EEEC"
+textColor = "#1F2F37"
+linkColor = "#1C4A5E"
+redColor = "#B8482A"
+blueColor = "#1C4A5E"
+font = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap"
+headingFont = "'Hanken Grotesk':https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap"
 headingFontWeights = 300
 baseRadius = "2px"
 buttonRadius = "2px"
-borderColor = "#BCC5C1"
+borderColor = "#A9B9BB"
 showWidgetBorder = true
 showSidebarBorder = true
-dataframeBorderColor = "#BCC5C1"
-dataframeHeaderBackgroundColor = "#E2E7E3"
+dataframeBorderColor = "#BCC9CA"
+dataframeHeaderBackgroundColor = "#E9EEEC"
 
 [theme.sidebar]
-backgroundColor = "#E2E7E3"
-secondaryBackgroundColor = "#D3D9D4"
+backgroundColor = "#CDD8D8"
+secondaryBackgroundColor = "#DCE3E2"
 
 [client]
 toolbarMode = "minimal"

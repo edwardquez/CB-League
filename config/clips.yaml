@@ -1,0 +1,10 @@
+# Clips on each player's page (Players). Files live in assets/clips/<name>.mp4: H.264, 720p, no sound.
+# Order here is the order they show. To add one: drop the .mp4 in assets/clips and add its name under the player.
+Arath: [arath16streakclip, arathsmokessal, arathpiecing]
+Carl: [carlclip1, carlclip2, carlclip3]
+Ed: [edclip1, edclip2]
+Fonz: [fonznaded, fonz1v1jason, fonzkillscarl]
+Jason: [jason1v1carl, jasonsmokessalclip, jasonkillscarl]
+Miguel: [miguelsniper2piece, miguel4piece, miguelrampage]
+Sal: [sal14piececlip, sal2piecesndr11, salcliproute]
+Vera: [vera3piececlip, veraoverloadjump, verafunny]

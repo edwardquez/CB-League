@@ -44,9 +44,17 @@ def label(text, top=0):
 
 def h2_row(title, right_key=None):
     """Big section title on the left, room for a control on the right, heavy rule under both."""
+    head = f"<div role='heading' class='cb-h2' style='font-weight:300; font-size:34px; margin-top:40px'>{title}</div>"
+    if right_key:
+        # a row that wraps instead of squeezing: the control keeps its full width (so no button is ever clipped)
+        # and drops under the title when the window is too narrow for both
+        row = st.container(horizontal=True, wrap=True, vertical_alignment="bottom", key=right_key)
+        with row:
+            ui.html(head)
+        return row
     c1, c2 = st.columns([3, 1.2], vertical_alignment="bottom")
     with c1:
-        ui.html(f"<div role='heading' class='cb-h2' style='font-weight:300; font-size:34px; margin-top:40px'>{title}</div>")
+        ui.html(head)
     return c2
 
 
@@ -109,7 +117,7 @@ def meetings(R):
     tiles = tally = ""
     for m in R["meet"]:
         fill = A_COL if m["win"] == "x" else B_COL if m["win"] == "y" else ui.STEEL
-        tiles += (f"<div style='background:{fill}; color:#F2F4F2; padding:10px 10px 12px; min-width:0'>"
+        tiles += (f"<div style='background:{fill}; color:{ui.on(fill)}; padding:10px 10px 12px; min-width:0'>"
                   f"<div style='display:flex; justify-content:space-between; gap:4px; font-size:11px; white-space:nowrap'><span>Series {m['no']}</span>"
                   f"<span>{m['date'].strftime('%b')} {m['date'].day}</span></div>"
                   f"<div style='font-weight:300; font-size:24px; margin-top:12px; letter-spacing:1px'>{m['score']}</div></div>")
@@ -141,9 +149,9 @@ def momentum(R):
         up = lead / lead_max * 100 if lead > 0 else 0
         dn = -lead / lead_max * 100 if lead < 0 else 0
         cols += (f"<div {ui.TAP} style='flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:stretch'>"
-                 f"<div style='height:74px; display:flex; align-items:flex-end'><div style='width:100%; height:{up:.0f}%; background:{fill}'></div></div>"
+                 f"<div style='height:74px; display:flex; align-items:flex-end'><div class='cb-gy' style='width:100%; height:{up:.0f}%; background:{fill}; animation-delay:{.06 * i:.2f}s'></div></div>"
                  f"<div style='height:1px; background:{ui.STEEL}'></div>"
-                 f"<div style='height:74px; display:flex; align-items:flex-start'><div style='width:100%; height:{dn:.0f}%; background:{fill}'></div></div>"
+                 f"<div style='height:74px; display:flex; align-items:flex-start'><div class='cb-gyd' style='width:100%; height:{dn:.0f}%; background:{fill}; animation-delay:{.06 * i:.2f}s'></div></div>"
                  f"<span style='font-size:11px; color:{ui.MUTED}; margin-top:6px; text-align:center'>{m['no']}</span>{tp}</div>")
     return (label("Momentum · series lead after each meeting")
             + f"<div style='display:flex; gap:6px; margin-top:14px'>{cols}</div>"
@@ -164,8 +172,8 @@ def mode_split(R):
                  f"<span style='font-size:15px; font-weight:600; color:{A_COL}'>{wx}</span>"
                  f"<span style='text-align:center; font-size:15px'>{MODE[mo]}</span>"
                  f"<span style='text-align:right; font-size:15px; font-weight:600'>{wy}</span></div>"
-                 f"<div style='display:flex; gap:3px; height:10px; margin-top:6px'><div style='flex:{wx} 1 0; background:{A_COL}'></div>"
-                 f"<div style='flex:{wy} 1 0; background:{B_COL}'></div></div></div>")
+                 f"<div style='display:flex; gap:3px; height:10px; margin-top:6px'><div class='cb-gx fromr' style='flex:{wx} 1 0; background:{A_COL}'></div>"
+                 f"<div class='cb-gx' style='flex:{wy} 1 0; background:{B_COL}'></div></div></div>")
     parts = []
     if xs:
         parts.append(f"{names(R['x'])} own {' and '.join(xs)}")
@@ -183,7 +191,7 @@ def duel(R, rp):
     a = rp[rp.player == px].set_index("match_id"); b = rp[rp.player == py].set_index("match_id")
     both = a.index.intersection(b.index); a, b = a.loc[both], b.loc[both]
     n = len(both)
-    rows = [("Kills / map", a.kills.mean(), b.kills.mean(), 1), ("K/D", a.kills.sum() / max(a.deaths.sum(), 1), b.kills.sum() / max(b.deaths.sum(), 1), 2),
+    rows = [("Kills / Map", a.kills.mean(), b.kills.mean(), 1), ("K/D", a.kills.sum() / max(a.deaths.sum(), 1), b.kills.sum() / max(b.deaths.sum(), 1), 2),
             ("MAR", a.mar.sum(), b.mar.sum(), 2 if max(abs(a.mar.sum()), abs(b.mar.sum())) < 2 else 1),
             ("Out-fragged the other", int((a.kills > b.kills).sum()), int((b.kills > a.kills).sum()), 0),
             ("Maps won", int((a.result == "W").sum()), int((b.result == "W").sum()), 0)]
@@ -222,8 +230,7 @@ def show_rivalries():
     if not rivs:
         ui.html(ui.empty_box("No rivalries yet this season", "A matchup appears here once the same two lineups have met twice."))
         return
-    ui.html(ui.note("Lineups that have met at least twice, most meetings first. A rivalry is tagged small sample until its third meeting. "
-                    "Open one for the full story.", 16, 14) + f"<div style='border-top:2px solid {ui.INK}; margin-top:24px'></div>")
+    ui.html(ui.note("Lineups that have met at least twice, most meetings first. A rivalry is tagged small sample until its third meeting.", 16, 14) + f"<div style='border-top:2px solid {ui.INK}; margin-top:24px'></div>")
     opened = st.session_state.setdefault("rv_open", {})
     for R in rivs:
         n = len(R["meet"])
@@ -235,8 +242,8 @@ def show_rivalries():
                     f"<span class='cb-rivx' style='text-align:right; font-size:17px; font-weight:{wx}'><span style='display:inline-block; width:12px; height:12px; "
                     f"background:{A_COL}; margin-right:10px'></span>{dot(R['x'])}</span>"
                     f"<div class='cb-rivscore' style='text-align:center'><div style='display:flex; justify-content:center; align-items:center; gap:14px; font-weight:300; font-size:34px; line-height:1'>"
-                    f"<span style='color:{A_COL}'>{R['sx']}</span><span style='display:inline-block; width:14px; height:1px; background:{ui.MUTED}'></span>"
-                    f"<span>{R['sy']}</span></div></div>"
+                    f"<span class='cbn' style='color:{A_COL}'>{R['sx']}</span><span style='display:inline-block; width:14px; height:1px; background:{ui.MUTED}'></span>"
+                    f"<span class='cbn'>{R['sy']}</span></div></div>"
                     f"<span style='font-size:17px; font-weight:{wy}'><span style='display:inline-block; width:12px; height:12px; background:{B_COL}; "
                     f"margin-right:10px'></span>{dot(R['y'])}</span>"
                     # own row under the names and score, so a long meta line doesn't squeeze 4v4 lineups onto two lines
@@ -262,15 +269,22 @@ TEAM_CSS = f"""<style>
 [class*="st-key-pvc_"] [data-testid="stMarkdownContainer"] {{ margin-bottom:0 !important; }}
 [class*="st-key-pvc_"] [data-testid="stElementContainer"]:has(button) {{ position:absolute; inset:0; z-index:3; margin:0; width:100% !important; }}
 [class*="st-key-pvc_"] [data-testid="stElementContainer"]:has(button) > div, [class*="st-key-pvc_"] .stButton {{ height:100%; width:100%; }}
-[class*="st-key-pvc_"] button {{ width:100%; height:100% !important; min-height:0; opacity:0; cursor:pointer; }}
-.pv-card {{ position:relative; min-width:72px; min-height:46px; padding:6px 10px; box-sizing:border-box; border:1px solid #BCC5C1;
+[class*="st-key-pvc_"] button, [class*="st-key-pvc_"] button:disabled, [class*="st-key-pvc_"] button * {{ opacity:0 !important; color:transparent !important; }}
+[class*="st-key-pvc_"] button {{ width:100%; height:100% !important; min-height:0; cursor:pointer; }}
+[class*="st-key-pvc_"] button:disabled {{ cursor:default; }}
+[class*="st-key-pvc_"] {{ width:100px !important; min-width:100px; max-width:100px; flex:none !important; }}
+.pv-card {{ position:relative; width:100%; height:48px; padding:6px 10px; box-sizing:border-box; border:1px solid {ui.RULE2};
   border-radius:2px; font-size:14px; line-height:1.2; color:{ui.INK}; white-space:nowrap; }}
+.pv-card > div:not(.cb-tip) {{ overflow:hidden; text-overflow:ellipsis; }}
 .pv-card .pv-s {{ font-size:12px; }}
-.st-key-pv_pick_A .pv-card.on {{ background:{A_COL}; border-color:{A_COL}; color:#F2F4F2; }}
-.st-key-pv_pick_B .pv-card.on {{ background:{B_COL}; border-color:{B_COL}; color:#F2F4F2; }}
+.st-key-pv_pick_A .pv-card.on {{ background:{A_COL}; border-color:{A_COL}; color:{ui.on(A_COL)}; }}
+.st-key-pv_pick_B .pv-card.on {{ background:{B_COL}; border-color:{B_COL}; color:{ui.on(B_COL)}; }}
 .pv-card.off {{ opacity:0.45; }}
 [class*="st-key-pvc_"]:hover .pv-card:not(.on):not(.off) {{ border-color:{ui.INK}; }}
 [class*="st-key-pvc_"]:hover .cb-tip {{ display:block; }}
+.st-key-pv_outlook_row {{ justify-content:space-between; row-gap:8px; }}
+.st-key-pv_outlook_row > [data-testid="stElementContainer"]:first-child {{ flex:1 1 220px !important; width:auto !important; min-width:0; }}
+.st-key-pv_outlook_row > [data-testid="stElementContainer"]:last-child {{ flex:0 0 auto !important; width:auto !important; }}
 </style>"""
 
 
@@ -323,7 +337,7 @@ def show_preview():
     TA, TB = ss.pv_a, ss.pv_b
     fc1, fc2 = st.columns([1, 4], vertical_alignment="center")
     with fc1:
-        if st.button("Make fair teams", disabled=len(TA) + len(TB) < 2):
+        if st.button("Make Fair Teams", disabled=len(TA) + len(TB) < 2):
             allp = TA + TB; h = len(allp) // 2; best = None
             for a in combinations(allp, h):
                 b = [p for p in allp if p not in a]
@@ -347,8 +361,8 @@ def show_preview():
     ui.html(label("Balance", 32).replace(f"border-bottom:1px solid {ui.STEEL}", "border-bottom:0")
             + f"<div style='font-weight:300; font-size:30px; margin-top:4px'>{verdict}</div>"
             + f"<div style='display:flex; height:22px; margin-top:12px'>"
-              f"<div {ui.TAP} style='flex:{pa} 1 0; background:{A_COL}; color:#F2F4F2; font-size:12px; font-weight:600; display:flex; align-items:center; padding:0 8px'>{pa}%{ta}</div>"
-              f"<div {ui.TAP} style='flex:{pb} 1 0; background:{B_COL}; color:#F2F4F2; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:flex-end; padding:0 8px'>{pb}%{tb}</div></div>"
+              f"<div class='cb-tap cb-bal' tabindex='0' style='--from:50%; flex:0 0 {pa}%; background:{A_COL}; color:{ui.on(A_COL)}; font-size:12px; font-weight:600; display:flex; align-items:center; padding:0 8px'>{pa}%{ta}</div>"
+              f"<div {ui.TAP} style='flex:{pb} 1 0; background:{B_COL}; color:{ui.on(B_COL)}; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:flex-end; padding:0 8px'>{pb}%{tb}</div></div>"
             + f"<div style='display:flex; justify-content:space-between; gap:12px; margin-top:8px; font-size:14px'>"
               f"<span>Team A · Avg Rating {round(avg(TA))}</span><span>Team B · Avg Rating {round(avg(TB))}</span></div>"
             + (ui.note("Teams are different sizes, so the meter is only a rough guide.", 8, 12) if len(TA) != len(TB) else "")
@@ -422,9 +436,10 @@ def show_preview():
     # ---------------- map outlook
     cfg = ts.get(tid or pm.title.iloc[-1], {})
     modes = [k for k in ["HP", "SND", "OVL", "HJ"] if k in set(pm["mode"])]
-    right = h2_row("Map Outlook")
+    right = h2_row("Map Outlook", "pv_outlook_row")
     with right:
-        mo = st.segmented_control("Outlook mode", modes, default=modes[0], format_func=MSHORT.get, key="pv_mode", label_visibility="collapsed") or modes[0]
+        mo = st.segmented_control("Outlook Mode", modes, default=modes[0], format_func=MSHORT.get, key="pv_mode",
+                                  label_visibility="collapsed", width="content") or modes[0]
     mcfg = (cfg.get("modes") or {}).get(mo, {})
     active = [m["name"] for m in mcfg.get("maps", []) if m.get("status") != "retired"] or sorted(pm[pm["mode"] == mo]["map"].unique())
     retired = [m["name"] for m in mcfg.get("maps", []) if m.get("status") == "retired"]
@@ -464,7 +479,7 @@ def show_preview():
     with right:
         mp = st.selectbox(f"{MSHORT[mo]} map", opts, key=f"pv_map_{mo}", format_func=lambda m: m + (" (retired)" if m in retired else ""))
     stats = pj.stats_for(mo)
-    lab = {"kills": "Kills", "damage": "Damage", "hill_time": "Hill time", "first_bloods": "First bloods", "overloads": "Overloads"}
+    lab = {"kills": "Kills", "damage": "Damage", "hill_time": "Hill time", "first_bloods": "First Bloods", "overloads": "Overloads"}
     fe = {"kills": lambda v: f"{v:.1f}", "damage": ui.n0, "hill_time": ui.mmss, "first_bloods": lambda v: f"{v:.1f}", "overloads": lambda v: f"{v:.1f}"}
     fr = {"hill_time": ui.mmss, "damage": ui.n0}
     lg = _swings(tid, data.version())

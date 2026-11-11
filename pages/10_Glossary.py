@@ -23,7 +23,7 @@ ui.html(f"<style>.cb-gjump a{{color:{ui.INK} !important; text-decoration:none !i
 
 
 def note_ink(text, top=8, size=15):
-    return f"<p style='margin:{top}px 0 0; font-size:{size}px; line-height:1.55; max-width:720px'>{text}</p>"
+    return f"<p data-sc style='margin:{top}px 0 0; font-size:{size}px; line-height:1.55; max-width:720px'>{text}</p>"   # reference text: sentence case
 
 
 def section(id_, title, rule=False):
@@ -140,7 +140,7 @@ groups = [
         T("Non-traded kills", "NTK", "Kills the other team didn’t answer by immediately killing you back.", "Counted inside kills, so it isn’t added to MAR separately."),
         T("Damage", "Dmg", "Total damage dealt to enemies in a map.", "Mostly turns into kills, so MAR doesn’t count it separately to avoid double-counting."),
         T("Assists", "A", "Damaged an enemy that a teammate finished.", "Worth a quarter of a kill in MAR (Playmaking)."),
-        T("Best streak", "Streak", "Most kills in a row without dying in a single map."),
+        T("Best Streak", "Streak", "Most kills in a row without dying in a single map."),
         T("Match length", "mm:ss", "How long the map lasted, from the caster scoreboard. Recorded from Modern Warfare 4 on.",
           "Used for per-minute stats like fights per minute."),
         T("Fights per minute", "Engagements", "Kills plus deaths per minute: how often a player is in a fight.", "Needs match length, so it starts with MW4."),
@@ -158,9 +158,9 @@ groups = [
           "Saved exactly as shown: the game's own formula isn't simply total kills divided by hills, so the site doesn't recalculate it."),
         T("Damage per hill", "Dmg/hill", "Damage per hill rotation, as the caster scoreboard shows it.", "Saved exactly as shown, like kills per hill.")]),
     ("snd", "Search and Destroy", [
-        T("First bloods", "FB", "Got the first kill of a round, opening a 4v3 (or 3v2)."),
+        T("First Bloods", "FB", "Got the first kill of a round, opening a 4v3 (or 3v2)."),
         T("First deaths", "FD", "Died first in a round. Lower is better."),
-        T("First-blood margin", "FB ±", "First bloods minus first deaths.", "In MAR (Playmaking), each net first blood is worth half a kill."),
+        T("First-blood margin", "FB ±", "First Bloods minus first deaths.", "In MAR (Playmaking), each net first blood is worth half a kill."),
         T("Plants", "Bomb plants", "Bombs planted.", "In MAR (Objective), each plant is worth one kill."),
         T("Defuses", "Bomb defuses", "Bombs defused.", "Saved from the scoreboard; not part of MAR."),
         T("Kills per round", "K/round", "Kills divided by rounds played (both teams' rounds won added together).",
@@ -251,8 +251,8 @@ out = ""
 for gid, title, terms in groups:
     body = "".join(f"<div class='cb-term' style='display:grid; grid-template-columns:220px minmax(0,1fr); gap:6px 24px; padding:16px 0; border-bottom:1px solid {ui.RULE}'>"
                    f"<div><div style='font-size:16px; font-weight:600'>{t}</div><div style='font-size:12px; color:{ui.MUTED}; margin-top:2px'>{ab}</div></div>"
-                   f"<div><p style='margin:0; font-size:14px; line-height:1.55'>{m}</p>"
-                   + (f"<p style='margin:6px 0 0; font-size:13px; color:{ui.MUTED}; line-height:1.55'>{h}</p>" if h else "") + "</div></div>"
+                   f"<div><p data-sc style='margin:0; font-size:14px; line-height:1.55'>{m}</p>"
+                   + (f"<p data-sc style='margin:6px 0 0; font-size:13px; color:{ui.MUTED}; line-height:1.55'>{h}</p>" if h else "") + "</div></div>"
                    for t, ab, m, h in terms)
     out += section(gid, title) + f"<div style='border-top:2px solid {ui.INK}; margin-top:12px'>{body}</div></section>"
 ui.html(out + "<style>@media (max-width:640px){.cb-term{grid-template-columns:minmax(0,1fr) !important}}</style>")

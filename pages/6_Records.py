@@ -14,8 +14,8 @@ MS = {"HP": "HP", "SND": "SnD", "OVL": "OVL", "HJ": "Hijack"}
 MODEN = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}
 MIN = 10
 
-tab = st.segmented_control("View", ["awards", "records"], default="awards", key="ra_tab", label_visibility="collapsed",
-                           format_func={"awards": "Awards", "records": "Records"}.get) or "awards"
+tab = st.segmented_control("View", ["awards", "records", "fun"], default="awards", key="ra_tab", label_visibility="collapsed",
+                           format_func={"awards": "Awards", "records": "Records", "fun": "Fun Facts"}.get) or "awards"
 if e.empty:
     ui.html(ui.empty_box(f"No {ts.get(season, {}).get('name', '')} records yet", "Records and awards fill in as series are entered."))
     st.stop()
@@ -123,6 +123,58 @@ if tab == "awards":
                 f"border-top:2px solid {ui.INK}; margin-top:12px'>{cells}</div>")
     st.stop()
 
+# ------------------------------------------------------------------ fun facts
+@st.cache_data(show_spinner=False, max_entries=8)
+def fun_facts(t, v):
+    from cbl.stats import funfacts
+    d = data.load_docs()
+    ser = [x for x in d["series"] if t is None or x["title"] == t]
+    name = (lambda sid: f"Series {next(x['series_no'] for x in ser if x['_id'] == sid)}") if t else \
+        (lambda sid: next(f"{short(x['title'])} Series {x['series_no']}" for x in ser if x["_id"] == sid))
+    return funfacts.facts(d["player_matches"], d["matches"], ser, name)
+
+
+if tab == "fun":
+    import re
+    from html import escape as E
+    hero, rest = fun_facts(tid, data.version())
+    if hero is None:
+        ui.html(ui.empty_box("No Fun Facts yet", "They turn up once a few series are in."))
+        st.stop()
+    hl, roasts = [], 0
+    for f in rest:
+        if len(hl) == 9:
+            break
+        if f["tone"] == "roast":
+            if roasts:
+                continue
+            roasts += 1
+        hl.append(f)
+    groups = {"Highlights": hl, **{g: [f for f in rest if f["group"] == g] for g in ["Players", "Head to Head", "Maps & Modes", "Streaks & Form", "Oddities"]}}
+    groups = {k: v for k, v in groups.items() if v}
+    pnames = sorted(set(e.pm.player), key=len, reverse=True)
+
+    def who(t):   # player names stand out in the context line
+        return re.sub(r"\b(" + "|".join(map(re.escape, pnames)) + r")\b", f"<b style='color:{ui.INK}; font-weight:600'>\\1</b>", E(t)) if pnames else E(t)
+    tag = lambda f: (f"<span style='font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:{ui.on(ui.BLUE)}; "  # noqa: E731
+                     f"background:{ui.BLUE}; padding:2px 6px; flex:none'>New</span>" if f["new"] else "")
+    big = lambda t, size: f"<div style='font-size:{size}px; font-weight:300; line-height:1.2; letter-spacing:-.2px; text-wrap:balance'>{E(t)}</div>"  # noqa: E731
+    line = lambda f, fs: f"<p style='margin:8px 0 0; font-size:{fs}px; color:{ui.MUTED}; line-height:1.5; text-wrap:pretty'>{who(f['line'])}</p>"  # noqa: E731
+    ui.html(ui.note("The league's oddest numbers, updated after every series.", 16, 14)
+            + f"<div class='cb-fig cb-rise' style='border-top:2px solid {ui.INK}; padding:22px 0 26px; margin-top:22px'>"
+            f"<div style='display:flex; gap:10px; align-items:center'>{ui.label('Fact of the Season · ' + hero['title'])}{tag(hero)}</div>"
+            f"<div style='margin-top:12px'>{big(hero['big'], 52)}</div>{line(hero, 16)}</div><div style='height:18px'></div>")
+    g = ui.tabs("ff_tab", list(groups), {})
+    cards = "".join(f"<div class='cb-fig cb-rise' style='border-top:2px solid {ui.INK}; padding:16px 0 20px; min-width:0; animation-delay:{.04 * min(i, 10):.2f}s'>"
+                    f"<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; min-height:18px'>"
+                    f"<span class='cb-lab' style='font-size:11px; font-weight:600; letter-spacing:1.6px; text-transform:uppercase; color:{ui.MUTED}'>{E(f['title'])}</span>{tag(f)}</div>"
+                    f"<div style='margin-top:10px'>{big(f['big'], 22)}</div>{line(f, 13)}</div>" for i, f in enumerate(groups[g]))
+    last = max(e.series.series_no) if len(e.series) else 0
+    ui.html(f"<div class='cb-ff' style='display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap:4px 28px; margin-top:6px'>{cards}</div>"
+            + ui.note(f"Through {'Series ' + str(last) if tid else 'the latest series'} · <b style='font-weight:600'>New</b> = changed last series", 14, 12)
+            + "<style>@media (max-width:640px){.cb-ff{grid-template-columns:minmax(0,1fr) !important; row-gap:0 !important}}</style>")
+    st.stop()
+
 # ------------------------------------------------------------------ records
 pm, S, M = e.pm, e.series, e.maps
 
@@ -198,7 +250,7 @@ mp_lead = n[n == n.max()].index
 g4 = [car("kills", "Kills", lambda v: f"{int(v):,}"), car("damage", "Damage", ui.n0),
       ("Maps played", str(int(n.max())), join(sorted(mp_lead)), "tied" if len(mp_lead) > 1 else ""),
       car("hill_time", "Time on the hill", lambda v: f"{int(v // 60)}:{int(v % 60):02d}", pm[pm["mode"] == "HP"], lambda p, x: f"{len(x[x.player == p])} Hardpoint maps"),
-      car("first_bloods", "First bloods", lambda v: str(int(v)), pm[pm["mode"] == "SND"], lambda p, x: f"{len(x[x.player == p])} SnD maps"),
+      car("first_bloods", "First Bloods", lambda v: str(int(v)), pm[pm["mode"] == "SND"], lambda p, x: f"{len(x[x.player == p])} SnD maps"),
       car("overloads", "Overloads", lambda v: str(int(v)), pm[pm["mode"] == "OVL"], lambda p, x: f"{len(x[x.player == p])} Overload maps")]
 
 suffix = "" if tid is None else f" · {ts.get(tid, {}).get('name', tid)}"

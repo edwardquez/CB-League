@@ -172,6 +172,11 @@ def create_series(title: str, date, fmt: str, best_of: int, team_a: list[str], t
     return sid
 
 
+def save_veto(sid: str, veto: dict | None) -> None:
+    """The finished map veto for a series (cbl/veto.py), or None to clear it."""
+    _db().series.update_one({"_id": sid}, {"$set": {"veto": veto}}); refresh()
+
+
 def update_series(sid: str, **fields) -> None:
     _db().series.update_one({"_id": sid}, {"$set": fields}); refresh()
 
@@ -182,7 +187,8 @@ def next_match_no(title: str) -> int:
 
 
 def save_map(series: dict, mode: str, map_name: str, score_a: int, score_b: int, length_sec, board: str,
-             rows: list[dict], match_id: str | None = None) -> str:
+             rows: list[dict], match_id: str | None = None, extra: dict | None = None) -> str:
+    """extra: optional map facts kept on the match, e.g. {"picked_by": "A", "side": "good", "side_by": "B"} from the veto."""
     db = _db(); title = series["title"]
     if match_id is None:
         match_id = f"{title}-M{next_match_no(title):03d}"
@@ -192,7 +198,7 @@ def save_map(series: dict, mode: str, map_name: str, score_a: int, score_b: int,
     winner = "A" if score_a > score_b else "B"
     db.matches.replace_one({"_id": match_id}, {"_id": match_id, "title": title, "series_id": series["_id"], "map_no": map_no,
                                                "mode": mode, "map": map_name, "score_a": int(score_a), "score_b": int(score_b),
-                                               "winner": winner, "length_sec": length_sec, "board": board}, upsert=True)
+                                               "winner": winner, "length_sec": length_sec, "board": board, **(extra or {})}, upsert=True)
     db.player_matches.delete_many({"match_id": match_id})
     docs = []
     for r in rows:

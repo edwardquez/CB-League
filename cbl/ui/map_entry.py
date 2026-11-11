@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass
+from html import escape
 from typing import Callable
 
 import streamlit as st
@@ -14,6 +15,7 @@ from cbl.config import CORE_STATS, EXTRA_STATS, FLOAT_STATS, STAT_LABELS
 from cbl.ui import styles as ui
 
 MODEN = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}
+SIDE_LABEL = {"good": "Good Side", "bad": "Bad Side", "attack": "Attack First", "defend": "Defend First"}
 SHORT = {"HP": "Hardpoint", "SND": "SnD", "OVL": "Overload", "HJ": "Hijack"}
 
 
@@ -24,6 +26,18 @@ def css() -> str:
 [class*="st-key-skfull_"] [role="radiogroup"] {{ width: 100% !important; max-width: none !important; flex-wrap: nowrap; }}
 [class*="st-key-skfull_"] button[data-variant="segmented_control"] p {{ white-space: nowrap; }}
 [class*="st-key-skfull_"] button[data-variant="segmented_control"] {{ flex: 1 1 0; min-height: 46px; }}
+/* picture tiles (maps, veto): one wrapping row; four to a row on a computer (three in the veto), two on a phone */
+[class*="st-key-sktg_"] {{ gap: 8px !important; }}
+[class*="st-key-sktg_"] > div:has(> [class*="st-key-skmap_"]) {{ flex: 0 0 calc((100% - 24px) / 4); width: calc((100% - 24px) / 4); min-width: 0; }}
+.st-key-sktg_vt > div:has(> [class*="st-key-skmap_"]) {{ flex: 0 0 calc((100% - 16px) / 3); width: calc((100% - 16px) / 3); }}
+@media (max-width: 640px) {{
+  [class*="st-key-sktg_"] > div:has(> [class*="st-key-skmap_"]), .st-key-sktg_vt > div:has(> [class*="st-key-skmap_"]) {{
+    flex: 0 0 calc((100% - 8px) / 2); width: calc((100% - 8px) / 2); }}
+}}
+/* Who Picked This Map?: two to a row, so the team names fit */
+[class*="st-key-skfull_who"] [role="radiogroup"] {{ flex-wrap: wrap !important; }}
+[class*="st-key-skfull_who"] button[data-variant="segmented_control"] {{ flex: 1 1 45%; }}
+[class*="st-key-skfull_who"] button[data-variant="segmented_control"] p {{ white-space: normal; }}
 /* map tiles: picture + name are one card; an invisible button covers the whole card */
 [class*="st-key-skmap_"] {{ position: relative; gap: 0 !important; }}
 [class*="st-key-skmap_"] [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
@@ -37,7 +51,6 @@ def css() -> str:
 [class*="st-key-skocr_"] {{ background: {ui.PANEL}; }}
 </style>"""
 
-YELLOW = "#FBEFC2"   # a cell read off the screenshot that needs a look
 
 
 def field(fn, label, key, store, name, default=None, **kw):
@@ -51,13 +64,17 @@ def field(fn, label, key, store, name, default=None, **kw):
     return v
 
 
-def new_draft(tcfg: dict, match: dict | None = None, prows: list[dict] | None = None) -> dict:
+def new_draft(tcfg: dict, match: dict | None = None, prows: list[dict] | None = None, plan: dict | None = None) -> dict:
+    """plan: this map's slot from the series' veto (cbl/veto.slot_for), which fills in the mode, map and who picked it."""
     active = [k for k, m in tcfg["modes"].items() if m.get("active", True)]
     d = {"id": uuid.uuid4().hex[:8], "sub": "info", "p": 0, "rows": {}, "match_id": None,
-         "mode": active[0] if active else "HP", "map": None, "sa": None, "sb": None, "lm": None, "ls": None, "board": "full"}
+         "mode": active[0] if active else "HP", "map": None, "sa": None, "sb": None, "lm": None, "ls": None, "board": "full",
+         "picked_by": None}
+    if plan and not match and plan.get("map"):
+        d.update({"mode": plan["code"], "map": plan["map"], "picked_by": plan["by"] if plan.get("by") in ("A", "B") else None})
     if match:
         d.update({"match_id": match["_id"], "mode": match["mode"], "map": match["map"], "sa": match["score_a"], "sb": match["score_b"],
-                  "board": match.get("board") or "full"})
+                  "board": match.get("board") or "full", "picked_by": match.get("picked_by")})
         if match.get("length_sec"):
             d["lm"], d["ls"] = int(match["length_sec"]) // 60, int(match["length_sec"]) % 60
         for r in prows or []:
@@ -155,10 +172,13 @@ class Ctx:
     label_a: str | None = None        # how each team is named on the review step
     label_b: str | None = None
     played: tuple = ()                # maps already played in this series (marked on the tiles)
-    on_cancel: Callable | None = None  # called by "Cancel editing" (and the first step's Cancel button if show_cancel)
+    on_cancel: Callable | None = None  # called by "Cancel Editing" (and the first step's Cancel button if show_cancel)
     show_cancel: bool = False
     color_a: str | None = None        # team colors (the Tournaments page passes its bracket colors)
     color_b: str | None = None
+    heading: bool = True              # draw the "Map N" heading (the Scorekeeper draws its own, with Edit Setup)
+    pick_opts: dict | None = None     # {"A": name, "B": name, "agreed": ..., "caster": ...}: ask Who Picked This Map?
+    plan: dict | None = None          # this map's slot from the series' veto (cbl/veto.slot_for)
 
     @property
     def lineup(self):
@@ -174,11 +194,34 @@ def entry(c: Ctx, D: dict) -> None:
     lineup = c.lineup
     la, lb = c.label_a or team_str(c.team_a), c.label_b or team_str(c.team_b)
     sub = D["sub"]; k = D["id"]; px = c.prefix
-    ui.html("<div style='display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:28px'>"
-            f"<div role='heading' class='cb-h2' style='font-weight:400; font-size:28px'>Map {c.map_no}</div>"
-            f"<span style='font-size:13px; color:{ui.MUTED}'>{({'info': 'Map details', 'players': 'Player stats', 'review': 'Review'})[sub]}"
-            f"{' · editing' if D['match_id'] else ''}</span></div><div style='border-top:2px solid {ui.INK}; margin-top:10px'></div>")
+    if c.heading:
+        ui.html("<div style='display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:28px'>"
+                f"<div role='heading' class='cb-h2' style='font-weight:400; font-size:28px'>Map {c.map_no}</div>"
+                f"<span style='font-size:13px; color:{ui.MUTED}'>{' Editing' if D['match_id'] else ''}</span></div>")
+    # the three parts of entering a map, as a strip under the heading
+    subs = [("info", "Map Details"), ("players", "Player Stats"), ("review", "Review")]
+    cur_i = [s for s, _ in subs].index(sub)
+    ui.html("<div style='display:flex; border-top:2px solid " + ui.INK + "; margin:10px 0 18px'>" + "".join(
+        f"<span style='flex:1 1 0; font-size:13px; padding:10px 0 0; margin-top:-2px; border-top:3px solid {ui.BLUE if i == cur_i else 'transparent'}; "
+        f"color:{ui.INK if i <= cur_i else ui.MUTED}; font-weight:{600 if i == cur_i else 400}'>{lab}</span>" for i, (_, lab) in enumerate(subs)) + "</div>")
     modes = {kk: m for kk, m in tcfg["modes"].items() if m.get("active", True) or kk == D["mode"]}
+    plan = c.plan if c.plan and c.plan.get("map") else None
+    if sub == "info" and plan:
+        la0, lb0 = c.label_a or team_str(c.team_a), c.label_b or team_str(c.team_b)
+        nm = {"A": la0, "B": lb0}
+        sq = lambda s: ui.swatch(ui.INK if s == "A" else ui.BLUE, 8, 8)  # noqa: E731
+        by = ("Left Over: the last " + (modes.get(plan["code"], {}).get("short") or SHORT.get(plan["code"], plan["code"])) + " map"
+              if plan["by"] == "left" else f"{sq(plan['by'])}Picked by {nm[plan['by']]}")
+        side = (f"<div style='font-size:13px; color:{ui.MUTED}; margin-top:4px; display:flex; align-items:center; gap:6px'>{sq(plan['side_by'])}"
+                f"{nm[plan['side_by']]} took {SIDE_LABEL[plan['side']]}</div>" if plan.get("side") else "")
+        ui.html(f"<div class='cb-fig' style='display:grid; grid-template-columns:132px minmax(0,1fr); gap:14px; align-items:center; padding:14px; "
+                f"background:{ui.PANEL}; border:1px solid {ui.RULE}; box-shadow:inset 3px 0 0 {ui.BLUE}'>{ui.img_tag(plan['map'])}<div>"
+                f"<div class='cb-lab' style='font-size:12px; font-weight:600; letter-spacing:1.6px; text-transform:uppercase; color:{ui.MUTED}'>From the Veto</div>"
+                f"<div style='font-size:16px; font-weight:600; margin-top:4px'>{MODEN.get(plan['code'], plan['code'])} on {plan['map']}</div>"
+                f"<div style='font-size:13px; color:{ui.MUTED}; margin-top:4px; display:flex; align-items:center; gap:6px'>{by}</div>{side}</div></div>"
+                + ui.note("Already filled in below. If a different map gets played, change it, or let the scoreboard screenshot fill it in: "
+                          "the map is then marked as changed, and the pick stays with the team that made it.", 8, 12)
+                + "<div style='height:12px'></div>")
     if sub == "info":
         if ocr.available():
             screenshot(c, D, modes)
@@ -203,22 +246,30 @@ def entry(c: Ctx, D: dict) -> None:
 
                 def pick_map(m):
                     D["map"] = m
-                for r0 in range(0, len(opts), 5):
-                    cols = st.columns(5, gap="small")
-                    for col, m in zip(cols, opts[r0:r0 + 5]):
-                        with col:
-                            with st.container(gap=None, key=f"skmap_{px}_{k}_{m.replace(' ', '_')}"):
-                                on = D["map"] == m
-                                tag = "Retired" if m in ret else ("Played" if m in c.played else "")
-                                # fixed two-line name area, so a long name (Reactor U92) keeps every tile the same height
-                                ui.html(f"<div class='sk-tile' style='box-sizing:border-box; border:{'2px solid ' + ui.BLUE if on else '1px solid ' + ui.RULE}; "
-                                        f"background:{ui.PANEL}'>{ui.img_tag(m)}<div style='height:44px; padding:5px 8px; box-sizing:border-box; overflow:hidden; "
-                                        f"font-size:13px; line-height:1.25; color:{ui.INK}; font-weight:{600 if on else 400}'>{m}"
-                                        + (f"<div style='font-size:11px; font-weight:400; color:{ui.MUTED}'>{tag}</div>" if tag else "") + "</div></div>")
-                                st.button(m, key=f"{px}m_{k}_{m}", on_click=pick_map, args=(m,), width="stretch")
+                with st.container(horizontal=True, wrap=True, gap="small", key=f"sktg_{px}_{k}"):
+                    for m in opts:
+                        with st.container(gap=None, key=f"skmap_{px}_{k}_{m.replace(' ', '_')}"):
+                            on = D["map"] == m
+                            tag = ("Retired" if m in ret else "Played" if m in c.played
+                                   else "Planned" if plan and plan["map"] == m and plan["code"] == mode else "")
+                            # fixed two-line name area, so a long name (Reactor U92) keeps every tile the same height
+                            ui.html(f"<div class='sk-tile' style='box-sizing:border-box; border:{'2px solid ' + ui.BLUE if on else '1px solid ' + ui.RULE}; "
+                                    f"background:{ui.PANEL}'>{ui.img_tag(m)}<div style='height:44px; padding:5px 8px; box-sizing:border-box; overflow:hidden; "
+                                    f"font-size:13px; line-height:1.25; color:{ui.INK}; font-weight:{600 if on else 400}'>{m}"
+                                    + (f"<div style='font-size:11px; font-weight:400; color:{ui.MUTED}'>{tag}</div>" if tag else "") + "</div></div>")
+                            st.button(m, key=f"{px}m_{k}_{m}", on_click=pick_map, args=(m,), width="stretch")
             else:
-                D["map"] = field(st.text_input, "Map", f"{px}_{k}_mapt", D, "map", D["map"] or "", placeholder="Map name").strip().title() or None
+                D["map"] = field(st.text_input, "Map", f"{px}_{k}_mapt", D, "map", D["map"] or "", placeholder="Map Name").strip().title() or None
                 ui.html(ui.note(f"No {modes[mode].get('short', mode)} maps in {tcfg['name']}'s pool yet. Type it here, and add it under Season Settings so it shows next time.", 0, 12))
+            if c.pick_opts:
+                ui.html(ui.label("Who Picked This Map?", margin_top=14).replace("</div>", "<span style='font-weight:400; letter-spacing:0; "
+                        f"text-transform:none'> · optional</span></div>", 1) + "<div style='height:8px'></div>")
+                po = c.pick_opts
+                with st.container(key=f"skfull_who_{px}"):
+                    field(st.segmented_control, "Who picked this map", f"{px}_{k}_who", D, "picked_by", None, options=list(po),
+                          format_func=po.get, label_visibility="collapsed")
+                ui.html(ui.note("Filled in from the veto. Change it if plans changed." if plan else
+                                "Optional. Agreed and Caster maps, and blanks, don't count toward pick stats.", 4, 12) + "<div style='height:10px'></div>")
             c1, c2 = st.columns(2)
             with c1:
                 field(st.number_input, la, f"{px}_{k}_sa", D, "sa", None, min_value=0, step=1, placeholder="0")
@@ -238,7 +289,7 @@ def entry(c: Ctx, D: dict) -> None:
                       format_func={"full": "Full scoreboard · every stat", "partial": "Partial · only what we could see"}.get)
             D["board"] = D["board"] or "full"
             ready = D["map"] and D["sa"] is not None and D["sb"] is not None
-            if st.button("Next · player stats", type="primary", disabled=not ready, width="stretch", key=f"{px}_next_{k}"):
+            if st.button("Next · Player Stats", type="primary", disabled=not ready, width="stretch", key=f"{px}_next_{k}"):
                 D["sub"] = "players"; D["p"] = 0; st.rerun()
             if not ready:
                 ui.html(ui.note("Pick a map and enter both scores to continue.", 0, 12))
@@ -266,8 +317,8 @@ def entry(c: Ctx, D: dict) -> None:
             looks = [(f, w) for f, w in looks if w]
             if looks:
                 sel = ", ".join(f'[class*="st-key-{px}_{k}_{p}_{f}"] input' for f, _ in looks).replace("\\", "")
-                ui.html(f"<style>{sel} {{ background:{YELLOW} !important; }}</style>"
-                        f"<div style='margin:4px 0 6px; padding:10px 12px; background:{YELLOW}; font-size:13px; line-height:1.5'>"
+                ui.html(f"<style>{sel} {{ background:{ui.HL} !important; }}</style>"
+                        f"<div style='margin:4px 0 6px; padding:10px 12px; background:{ui.HL}; font-size:13px; line-height:1.5'>"
                         "<b style='font-weight:600'>Check against the picture:</b> "
                         + "; ".join(f"{STAT_LABELS[f].replace(' (sec)', '')}: {w}" for f, w in looks) + "</div>")
             cc = st.columns(2)
@@ -286,7 +337,7 @@ def entry(c: Ctx, D: dict) -> None:
                         field(st.number_input, STAT_LABELS[f], f"{px}_{k}_{p}_{f}", row, f, None, min_value=0, step=1, placeholder="—" if partial else "0")
             if ext:
                 open_ = any(row.get(f) is not None for f in ext) or any(f in dict(looks) for f in ext)
-                with st.expander("More Stats (optional, from the scoreboard)", expanded=open_):
+                with st.expander("More Stats (Optional, From the Scoreboard)", expanded=open_):
                     cc = st.columns(len(ext))
                     for j, f in enumerate(ext):
                         with cc[j]:
@@ -295,7 +346,7 @@ def entry(c: Ctx, D: dict) -> None:
                             else:
                                 field(st.number_input, STAT_LABELS[f], f"{px}_{k}_{p}_{f}", row, f, None, min_value=0, step=1, placeholder="—")
         a, b = st.columns([1, 2])
-        if a.button("Back to map" if i == 0 else "Back", width="stretch", key=f"{px}_pback_{k}"):
+        if a.button("Back to Map" if i == 0 else "Back", width="stretch", key=f"{px}_pback_{k}"):
             if i == 0:
                 D["sub"] = "info"
             else:
@@ -303,7 +354,7 @@ def entry(c: Ctx, D: dict) -> None:
             st.rerun()
         last = i == len(lineup) - 1
         ok = row.get("kills") is not None and row.get("deaths") is not None
-        if b.button("Review map" if last else f"Next · {lineup[i + 1][0]}", type="primary", width="stretch", disabled=not ok, key=f"{px}_pnext_{k}"):
+        if b.button("Review Map" if last else f"Next · {lineup[i + 1][0]}", type="primary", width="stretch", disabled=not ok, key=f"{px}_pnext_{k}"):
             if last:
                 D["sub"] = "review"
             else:
@@ -316,7 +367,7 @@ def entry(c: Ctx, D: dict) -> None:
         missing = [p for p, _ in lineup if rows.get(p, {}).get("kills") is None or rows.get(p, {}).get("deaths") is None]
         if missing:
             ui.html(ui.empty_box("Some players are missing kills or deaths", ", ".join(missing)))
-            if st.button("Back to player stats", key=f"{px}_miss_{k}"):
+            if st.button("Back to Player Stats", key=f"{px}_miss_{k}"):
                 D["sub"] = "players"; D["p"] = [p for p, _ in lineup].index(missing[0]); st.rerun()
             return
         from_shot = bool(D.get("ocr_vals"))
@@ -331,7 +382,7 @@ def entry(c: Ctx, D: dict) -> None:
             time_look = "game_time" in hf and (D["lm"], D["ls"]) == (h0.get("lm"), h0.get("ls"))
             yl = ([f"{px}_{k}_sa", f"{px}_{k}_sb"] if score_look else []) + ([f"{px}_{k}_lm", f"{px}_{k}_ls"] if time_look else [])
             if yl:
-                ui.html("<style>" + ", ".join(f'[class*="st-key-{x}"] input' for x in yl) + f" {{ background:{YELLOW} !important; }}</style>")
+                ui.html("<style>" + ", ".join(f'[class*="st-key-{x}"] input' for x in yl) + f" {{ background:{ui.HL} !important; }}</style>")
             ui.html(ui.label("Score and Game Time", margin_top=14))
             c1, c2, c3, c4 = st.columns([1, 1, 0.7, 0.7])
             with c1:
@@ -367,7 +418,7 @@ def entry(c: Ctx, D: dict) -> None:
             v = rows[p].get(f)
             txt = "—" if v is None else ui.mmss(v) if f.endswith("hill_time") else ui.n0(v) if f == "damage" else f"{v:.2f}" if f in FLOAT_STATS else str(v)
             why = needs_look(D, p, f)
-            return {"v": txt, "bg": YELLOW, "title": why} if why else txt
+            return {"v": txt, "bg": ui.HL, "title": why} if why else txt
         body = []
         for p, side in lineup:
             r = rows[p]; kd = r["kills"] / max(r["deaths"], 1)
@@ -415,16 +466,22 @@ def entry(c: Ctx, D: dict) -> None:
                     f"<b style='font-weight:600'>{t}</b> {b}</div>")
         if warns:
             ui.html(ui.note("You can still save; warnings never block.", 6, 12))
-        if st.button(f"Save map {c.map_no}", type="primary", width="stretch", key=f"{px}_save_{k}"):
+        if st.button(f"Save Map {c.map_no}", type="primary", width="stretch", key=f"{px}_save_{k}"):
             out = []
             fields = req + opt + ext
             for p, side in lineup:
                 r = {f: rows[p].get(f) if f in fields else None for f in STAT_LABELS}
                 r = {f: _to_num(f, v) for f, v in r.items()}
                 out.append({"player": p, "team": side, **r})
-            c.on_save(D["mode"], D["map"], int(D["sa"]), int(D["sb"]), ln, D["board"], out, D["match_id"])
+            if c.pick_opts:   # the Scorekeeper also keeps who picked the map, and the side from the veto when it was played as planned
+                extra = {"picked_by": D.get("picked_by")}
+                if plan and plan["code"] == D["mode"] and plan["map"] == D["map"] and plan.get("side"):
+                    extra.update(side=plan["side"], side_by=plan["side_by"])
+                c.on_save(D["mode"], D["map"], int(D["sa"]), int(D["sb"]), ln, D["board"], out, D["match_id"], extra)
+            else:
+                c.on_save(D["mode"], D["map"], int(D["sa"]), int(D["sb"]), ln, D["board"], out, D["match_id"])
             st.rerun()
-        if D["match_id"] and st.button("Cancel editing", key=f"{px}_canced_{k}"):
+        if D["match_id"] and st.button("Cancel Editing", key=f"{px}_canced_{k}"):
             if c.on_cancel:
                 c.on_cancel()
             st.rerun()
@@ -452,7 +509,7 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
         ui.html("<div style='font-size:17px; font-weight:600'>Fill From Screenshot</div>"
                 f"<div style='font-size:13px; color:{ui.MUTED}; margin-top:2px'>The Codcaster scoreboard from the end of the map, read with Tesseract OCR. "
                 "Best: a PNG at 1920 × 1080 or larger, with both team tables and the map name in the picture.</div>")
-        up = st.file_uploader("Scoreboard screenshot", type=["png", "jpg", "jpeg", "webp"], key=f"{px}_up_{D.get('up_n', 0)}",
+        up = st.file_uploader("Scoreboard Screenshot", type=["png", "jpg", "jpeg", "webp"], key=f"{px}_up_{D.get('up_n', 0)}",
                               label_visibility="collapsed")
         if up is None:
             if D.get("ocr_board") and not D.get("ocr_vals"):
@@ -480,7 +537,7 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
         hf = B.get("header_flags", {})
 
         def hdr(txt, key):
-            return f"<span style='background:{YELLOW}; padding:0 4px' title='{hf[key]}'>{txt}</span>" if key in hf else txt
+            return f"<span style='background:{ui.HL}; padding:0 4px' title='{hf[key]}'>{txt}</span>" if key in hf else txt
         sa, sb = B["score"]
         score = hdr(f"{'?' if sa is None else sa} – {'?' if sb is None else sb}", "score")
         gtime = hdr(ui.mmss(B["game_time"]) if B["game_time"] else "no game time", "game_time")
@@ -510,12 +567,12 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
             def fmt(r, f):
                 v = r["stats"].get(f)
                 t = "?" if v is None else ui.mmss(v) if f in ocr.TIMES else f"{v:.2f}" if f in ocr.RATIOS else ui.n0(v) if f == "damage" else str(v)
-                return {"v": t, "bg": YELLOW, "title": r["flags"][f]} if f in r["flags"] else t
+                return {"v": t, "bg": ui.HL, "title": r["flags"][f]} if f in r["flags"] else t
             body = []
             for i, r in enumerate(B["rows"]):
                 if i and r["team"] != B["rows"][i - 1]["team"]:
                     body.append("SPACER")
-                body.append([{"v": r["name"] or "?", "w": 500}] + [fmt(r, f) for f in cols_])
+                body.append([{"v": f"<span data-sc>{escape(r['name'])}</span>" if r["name"] else "?", "w": 500}] + [fmt(r, f) for f in cols_])
             ui.html(ui.table([("Board name", "left")] + [(short.get(f, f), "right") for f in cols_], body, min_width=900, cell_pad="8px 6px")
                     + ui.note("Nothing is saved yet. Yellow means the reader wasn't sure (hover for why).", 6, 12))
         # which row is which player
@@ -537,7 +594,7 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
             with a1:
                 line = (f"{st_.get('kills', '?')}/{st_.get('deaths', '?')} · {ui.n0(st_['damage']) if st_.get('damage') is not None else '?'} dmg")
                 ui.html(f"<div style='display:flex; gap:10px; align-items:center; font-size:14px'>{ui.swatch(col, 4, 30)}"
-                        f"<div><div style='font-weight:500'>{r['name'] or '(name not read)'}</div>"
+                        f"<div><div data-sc style='font-weight:500'>{escape(r['name']) if r['name'] else '(Name Not Read)'}</div>"
                         f"<div style='font-size:12px; color:{ui.MUTED}'>{'Alpha' if r['team'] == 'alpha' else 'Bravo'} {r['slot']} · {line}</div></div></div>")
             with a2:
                 pk = st.selectbox(f"Player for {r['team']} row {r['slot']}", opts, key=key, label_visibility="collapsed",
@@ -586,3 +643,9 @@ def screenshot(c: Ctx, D: dict, modes: dict) -> None:
             D["up_n"] = D.get("up_n", 0) + 1
             D["sub"] = "review" if D["map"] and D["sa"] is not None and D["sb"] is not None else "info"
             st.rerun()
+
+
+def __getattr__(name: str):
+    if name == "YELLOW":   # a cell read off the screenshot that needs a look (theme-aware)
+        return ui.HL
+    raise AttributeError(name)

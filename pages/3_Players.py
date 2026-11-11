@@ -16,7 +16,10 @@ qp = st.query_params.get("player")
 if qp in everyone and "pl_pick" not in st.session_state:
     st.session_state["pl_pick"] = qp
 
-c0, c1, c2 = st.columns([2, 1, 1], vertical_alignment="bottom")
+ui.html("<style>@media (max-width: 640px) { .st-key-pl_head [data-testid='stHorizontalBlock'] { flex-flow: row wrap !important; }"
+        " .st-key-pl_head [data-testid='stColumn'] { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }"
+        " .st-key-pl_head [data-testid='stColumn']:first-child { flex: 1 0 100% !important; order: -1; } }</style>")
+c0, c1, c2 = st.container(key="pl_head").columns([2, 1, 1], vertical_alignment="bottom")
 with c1:
     plist = ePick.players or everyone
     who = st.session_state.get("pl_pick", plist[0] if plist else None)
@@ -49,9 +52,9 @@ ui.html(f"<style>.cb-jump a{{display:inline-flex; align-items:center; min-height
 
 
 def section(title, note, kpis, stats):
-    k = "".join(f"<div style='padding:18px 0 14px'><div style='font-weight:300; font-size:42px; line-height:1; color:{c}'>{v}</div>"
+    k = "".join(f"<div class='cb-kpi cb-rise' style='padding:18px 0 14px'><div class='cb-kpi-n' style='font-weight:300; font-size:42px; line-height:1; color:{c}'>{v}</div>"
                 f"<div style='font-size:13px; color:{ui.MUTED}; margin-top:8px'>{l}</div></div>" for v, l, c in kpis)
-    s = "".join(f"<div><div style='font-size:20px; font-weight:500'>{v}</div><div style='font-size:12px; color:{ui.MUTED}'>{l}</div></div>" for v, l in stats)
+    s = "".join(f"<div><div data-nocu style='font-size:20px; font-weight:500'>{v}</div><div style='font-size:12px; color:{ui.MUTED}'>{l}</div></div>" for v, l in stats)
     ui.html(f"<section id='{title.lower().replace(' ', '-')}' style='margin-top:44px'><div style='display:flex; justify-content:space-between; align-items:baseline; "
             f"gap:12px; flex-wrap:wrap; padding-bottom:8px; border-bottom:2px solid {ui.INK}'><div role='heading' class='cb-h2' style='font-weight:300; font-size:34px'>{title}</div>"
             f"<span style='font-size:13px; color:{ui.MUTED}'>{note}</span></div>"
@@ -69,7 +72,7 @@ for sid in smar.series_id:
     r = ser.loc[sid]; side = "A" if who in r.team_a else "B"; sw += int(r.winner == side)
 w = int((pm.result == "W").sum())
 section("Value", "Map wins added over a fill-in",
-        [(ui.sg(pm.mar.sum()), "MAR", ui.BLUE), (ui.sg(pm.mar.mean(), 2), "MAR per map", ui.INK), (str(nmvp), "Series MVPs", ui.INK),
+        [(ui.sg(pm.mar.sum(), 2), "MAR", ui.BLUE), (ui.sg(pm.mar.mean(), 2), "MAR per map", ui.INK), (str(nmvp), "Series MVPs", ui.INK),
          (f"{sw}-{len(smar) - sw}", "Series record", ui.INK)],
         [(n, "Maps"), (f"{w}-{n - w}", "Map record"), (ui.pct(w / n), "Map win %"), (len(smar), "Series played"), (ui.sg(pm.mar.max(), 2), "Best single-map MAR")])
 
@@ -79,7 +82,7 @@ for t in smar.merge(e.series[["_id", "series_no", "date", "title", "team_a", "wi
     side = "A" if who in t.team_a else "B"; won = t.winner == side
     is_mvp = mvps.get(t.series_id, ("",))[0] == who
     x.append(f"{'' if season != 'ALL' else data.titles().get(t.title, {}).get('short', '') + ' '}S{int(t.series_no)}"); y.append(t.mar)
-    col.append(ui.BLUE if is_mvp else (ui.STEEL if t.mar >= 0 else "#A3AEAD"))
+    col.append(ui.BLUE if is_mvp else (ui.STEEL if t.mar >= 0 else ui.ramp(.12)))
     sc = f"{t.wins_a}-{t.wins_b}" if side == "A" else f"{t.wins_b}-{t.wins_a}"
     tips.append((f"Series {int(t.series_no)} · {t.date.strftime('%b')} {t.date.day}" + (" · Series MVP" if is_mvp else ""),
                  f"{'Won' if won else 'Lost'} {sc}", f"MAR {ui.sg(t.mar, 2)}"))
@@ -88,17 +91,17 @@ fmax = max(max((abs(v) for v in y), default=0), 0.01); nb = len(y); gap = "6px" 
 bars = labs = ""
 for i, (lab, v, (h1_, b1, b2)) in enumerate(zip(x, y, tips)):
     mvp_ = col[i] == ui.BLUE
-    fill = ui.BLUE if mvp_ else (ui.STEEL if v >= 0 else "#EEF1EF")
+    fill = ui.BLUE if mvp_ else (ui.STEEL if v >= 0 else ui.ramp(0))
     edge = f"border:1px solid {ui.RULE}; border-bottom:0;" if v < 0 else ""
     tp = ui.tip(h1_, b1, b2, align="l" if i < 3 else "r" if i > nb - 4 else "")
     bars += (f"<div {ui.TAP} style='position:relative; flex:1 1 0; min-width:0; height:100%; display:flex; align-items:flex-end; justify-content:center'>"
-             f"<span style='display:block; width:100%; max-width:40px; height:{max(abs(v) / fmax * 130, 3):.0f}px; background:{fill}; box-sizing:border-box; {edge}'></span>{tp}</div>")
+             f"<span class='cb-gy' style='display:block; width:100%; max-width:40px; height:{max(abs(v) / fmax * 130, 3):.0f}px; background:{fill}; box-sizing:border-box; {edge}'></span>{tp}</div>")
     labs += f"<span style='flex:1 1 0; min-width:0; text-align:center; font-size:10px; color:{ui.MUTED}; overflow:hidden'>{lab}</span>"
 ui.html(ui.label("MAR by series · hover or tap a bar", margin_top=28)
         + f"<div style='display:flex; align-items:flex-end; gap:{gap}; height:150px; margin-top:12px; border-bottom:1px solid {ui.STEEL}'>{bars}</div>"
         + f"<div style='display:flex; gap:{gap}; margin-top:6px'>{labs}</div>"
         + ui.legend([(ui.swatch(ui.BLUE), "Series MVP"), (ui.swatch(ui.STEEL), "Other series"),
-                     (ui.swatch("#EEF1EF", border=f"1px solid {ui.RULE}"), "Below replacement")]))
+                     (ui.swatch(ui.ramp(0), border=f"1px solid {ui.RULE2}"), "Below replacement")]))
 
 c1, c2 = st.columns(2, gap="large")
 with c1:
@@ -110,11 +113,11 @@ with c1:
     rows = ""
     for lab, v, tx in parts:
         wd = min(1, abs(v) / bmax) * 50
-        c = "#B3BDBB" if lab == "Replacement Credit" else (ui.BLUE if v >= 0 else ui.STEEL)
+        c = ui.RULE2 if lab == "Replacement Credit" else (ui.BLUE if v >= 0 else ui.STEEL)
         rows += (f"<div {ui.TAP} style='display:grid; grid-template-columns:140px minmax(0,1fr) 52px; align-items:center; gap:10px; min-height:38px'>"
                  f"<span style='font-size:13px; color:{ui.MUTED if lab == 'Replacement Credit' else ui.INK}'>{lab}</span>"
                  f"<div style='position:relative; height:26px'><div style='position:absolute; left:50%; top:0; bottom:0; width:1px; background:{ui.STEEL}'></div>"
-                 f"<div style='position:absolute; top:5px; height:16px; left:{(50 if v >= 0 else 50 - wd):.1f}%; width:{max(wd, 0.6):.1f}%; background:{c}'></div></div>"
+                 f"<div class='cb-gx{'' if v >= 0 else ' fromr'}' style='position:absolute; top:5px; height:16px; left:{(50 if v >= 0 else 50 - wd):.1f}%; width:{max(wd, 0.6):.1f}%; background:{c}'></div></div>"
                  f"<span style='text-align:right; font-size:13px'>{ui.sg(v)}</span>{ui.tip(f'{lab}: {ui.sg(v, 2)} MAR', tx, align='l')}</div>")
     ui.html(ui.label("Where the MAR comes from", margin_top=12) + f"<div style='margin-top:10px'>{rows}</div>"
             f"<div style='display:grid; grid-template-columns:140px minmax(0,1fr) 52px; gap:10px; padding-top:8px; border-top:1px solid {ui.RULE}; margin-top:4px'>"
@@ -128,14 +131,14 @@ with c2:
            + ("Average starts after 3 maps" if roll[i] != roll[i] else f"5-map average {ui.sg(roll[i], 2)}")
            for i, (r, ui_mode) in enumerate(zip(d.itertuples(), d["mode"].map({"HP": "Hardpoint", "SND": "SnD", "OVL": "Overload", "HJ": "Hijack"})))]
     fig = go.Figure()
-    fig.add_hline(y=0, line_color="#A3AEAD", line_width=1)
+    fig.add_hline(y=0, line_color=ui.STEEL, line_width=1)
     fig.add_hline(y=d.mar.mean(), line_color=ui.BLUE, line_dash="dash", line_width=1)
-    fig.add_trace(go.Scatter(y=d.mar, mode="markers", marker=dict(color="#9AABAE", size=5), hovertext=lab, hoverinfo="text"))
+    fig.add_trace(go.Scatter(y=d.mar, mode="markers", marker=dict(color=ui.mix(ui.STEEL, ui.BG, .25), size=5), hovertext=lab, hoverinfo="text"))
     fig.add_trace(go.Scatter(y=roll, mode="lines", line=dict(color=ui.INK, width=2.5), hoverinfo="skip"))
     ui.plotly_layout(fig, 240); fig.update_xaxes(showticklabels=False, showgrid=False); fig.update_yaxes(tickformat="+.1f")
     ui.html(ui.label("Form · 5-map rolling MAR", margin_top=12))
     st.plotly_chart(fig, config=ui.PLOT_CONFIG, width="stretch")
-    ui.html(ui.legend([(ui.swatch(ui.INK, 18, 3), "5-map average"), (ui.swatch("#9AABAE", 8, 8, True), "Single map"),
+    ui.html(ui.legend([(ui.swatch(ui.INK, 18, 3), "5-map average"), (ui.swatch(ui.mix(ui.STEEL, ui.BG, .25), 8, 8, True), "Single map"),
                        (f"<span style='width:18px; border-top:1px dashed {ui.BLUE}; display:inline-block'></span>", "Season average")])
             + ui.note("Above the dashed line means playing better than usual. Hover or tap for each map.", 6, 12))
 
@@ -145,7 +148,7 @@ section("Slaying", "All modes combined",
         [(f"{k / max(dd, 1):.2f}", "K/D", ui.INK), (f"{pm.kills.mean():.1f}", "Kills per map", ui.INK), (ui.n0(pm.damage.mean()), "Damage per map", ui.INK),
          (("+" if k - dd > 0 else "") + str(k - dd), "Plus/minus", ui.INK)],
         [(f"{k:,}", "Kills"), (f"{dd:,}", "Deaths"), (f"{pm.deaths.mean():.1f}", "Deaths per map"), (f"{pm.assists.mean():.1f}", "Assists per map"),
-         (f"{pm.non_traded_kills.mean():.1f}", "Non-traded kills per map"), (ui.n0(pm.highest_streak.max()), "Best streak")])
+         (f"{pm.non_traded_kills.mean():.1f}", "Non-traded kills per map"), (ui.n0(pm.highest_streak.max()), "Best Streak")])
 
 # ---------------- modes
 WINBG = ui.mix(ui.BG, ui.BLUE, 0.25)
@@ -160,30 +163,31 @@ for mo in ["HP", "SND", "OVL", "HJ"]:
     nm = len(m); wm = int((m.result == "W").sum()); kd = m.kills.sum() / max(m.deaths.sum(), 1)
     base = [(nm, "Maps"), (f"{wm}-{nm - wm}", "Map record"), (ui.pct(wm / nm), "Win %")]
     if mo == "HP":
-        kp = [(ui.sg(m.mar.sum()), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.mmss(m.hill_time.mean()), "Hill time per map", ui.INK),
+        kp = [(ui.sg(m.mar.sum(), 2), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.mmss(m.hill_time.mean()), "Hill time per map", ui.INK),
               (f"{m.objective_kills.mean():.1f}", "Objective kills per map", ui.INK)]
-        stt = base + [(f"{m.kills.mean():.1f}", "Kills per map"), (ui.n0(m.damage.mean()), "Damage per map"), (ui.n0(m.highest_streak.max()), "Best streak")]
+        stt = base + [(f"{m.kills.mean():.1f}", "Kills per map"), (ui.n0(m.damage.mean()), "Damage per map"), (ui.n0(m.highest_streak.max()), "Best Streak")]
         col = ("Hill", "hill_time", ui.mmss)
     elif mo == "SND":
-        kp = [(ui.sg(m.mar.sum()), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.n0(m.first_bloods.sum()), "First bloods", ui.INK),
+        kp = [(ui.sg(m.mar.sum(), 2), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.n0(m.first_bloods.sum()), "First Bloods", ui.INK),
               (ui.sg(m.fbnet.mean(), 2), "First-blood margin per map", ui.INK)]
         stt = base + [(ui.n0(m.first_deaths.sum()), "First deaths"), (ui.n0(m.bombs_planted.sum()), "Bomb plants"),
                       (f"{m.kills.mean():.1f}", "Kills per map"), (ui.n0(m.damage.mean()), "Damage per map")]
         col = ("FB ±", "fbnet", lambda v: ui.sg(v, 0))
     elif mo == "OVL":
-        kp = [(ui.sg(m.mar.sum()), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.n0(m.overloads.sum()), "Overloads", ui.INK),
+        kp = [(ui.sg(m.mar.sum(), 2), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (ui.n0(m.overloads.sum()), "Overloads", ui.INK),
               (ui.n0(m.carrier_kills.sum()), "Carrier kills", ui.INK)]
         stt = base + [(ui.n0(m.kills_as_carrier.sum()), "Kills as carrier"), (f"{m.kills.mean():.1f}", "Kills per map"),
-                      (ui.n0(m.damage.mean()), "Damage per map"), (ui.n0(m.highest_streak.max()), "Best streak")]
+                      (ui.n0(m.damage.mean()), "Damage per map"), (ui.n0(m.highest_streak.max()), "Best Streak")]
         col = ("OVL", "overloads", lambda v: "—" if v != v else str(int(v)))
     else:
-        kp = [(ui.sg(m.mar.sum()), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (f"{m.kills.mean():.1f}", "Kills per map", ui.INK),
+        kp = [(ui.sg(m.mar.sum(), 2), "MAR", ui.BLUE), (f"{kd:.2f}", "K/D", ui.INK), (f"{m.kills.mean():.1f}", "Kills per map", ui.INK),
               (ui.n0(m.damage.mean()), "Damage per map", ui.INK)]
         stt = base
         col = ("Obj", "objective_kills", lambda v: "—" if v != v else str(int(v)))
     name = {"HP": "Hardpoint", "SND": "Search and Destroy", "OVL": "Overload", "HJ": "Hijack"}[mo]
     section(name, f"{nm} maps" + (" · small sample" if nm < 5 else ""), kp, stt)
-    with st.expander(f"Show all {nm} maps"):
+    ui.html("<div style='height:14px'></div>")       # breathing room between the stat line and the map list
+    with st.expander(f"Show All {nm} Maps"):
         kds = list((m.kills / m.deaths.clip(lower=1)).round(2)); mars = list(m.mar)
         rows = []
         for r in m.sort_values(["title", "seq"], ascending=False).itertuples():
@@ -192,13 +196,35 @@ for mo in ["HP", "SND", "OVL", "HJ"]:
                          "fg": ui.INK if won else ui.MUTED, "w": 600 if won else 400}, f"{int(r.kills)}-{int(r.deaths)}",
                          {"v": f"{kd_:.2f}", "bg": a[0], "fg": a[1], "w": 500}, ui.n0(r.damage), col[2](getattr(r, col[1])),
                          {"v": ui.sg(r.mar, 2), "bg": b[0], "fg": b[1], "w": 600}])
-        ui.html(ui.table([("Series", "left"), ("Map", "left"), ("Result", "left"), ("K-D", "right"), ("K/D", "right"), ("Dmg", "right"),
-                          (col[0], "right"), ("MAR", "right")], rows, min_width=560, cell_pad="9px 6px")
-                + ui.note("K/D and MAR shaded against this player's own maps in this mode: the darker the blue, the better.", 6, 12))
+        ui.html(ui.table_pc([("Series", "left"), ("Map", "left"), ("Result", "left"), ("K-D", "right"), ("K/D", "right"), ("Dmg", "right"),
+                             (col[0], "right"), ("MAR", "right")], rows, [1, 2, 4, 7], f"plmaps_{mo}", min_width=560, cell_pad="9px 6px")
+                + ui.note("K/D and MAR shaded against this player's own maps in this mode: " + ui.better() + ".", 6, 12))
+
+# ---------------------------------------------------------------- clips
+def _clips(name):
+    import yaml
+    from cbl.config import ROOT
+    try:
+        cfg = yaml.safe_load((ROOT / "config" / "clips.yaml").read_text()) or {}
+    except Exception:
+        return []
+    return [ROOT / "assets" / "clips" / f"{c}.mp4" for c in cfg.get(name, []) if (ROOT / "assets" / "clips" / f"{c}.mp4").exists()]
+
+
+_cl = _clips(who)
+if _cl:
+    ui.html(ui.h2("Clips", margin_top=56, right=f"<span style='font-size:13px; color:{ui.MUTED}'>{len(_cl)} clip{'s' if len(_cl) != 1 else ''}</span>")
+            + "<div style='height:18px'></div>")
+    for r0 in range(0, len(_cl), 3):
+        cols = st.columns(3, gap="medium")
+        for j, (col, f) in enumerate(zip(cols, _cl[r0:r0 + 3])):
+            with col:
+                with st.container(key=f"cbclip_{r0 + j}"):
+                    st.video(str(f), autoplay=True, muted=True, loop=True)
 
 st.write("")
 _csv = pm.drop(columns=["_id"], errors="ignore")
 _num = _csv.select_dtypes("number").columns          # round the numbers only (pandas warns when asked to round dates)
 _csv[_num] = _csv[_num].round(3)
-st.download_button(f"Download {who}'s maps (CSV)", _csv.to_csv(index=False).encode(),
+st.download_button(f"Download {who}'s Maps (CSV)", _csv.to_csv(index=False).encode(),
                    f"{who.lower()}_maps.csv", "text/csv")

@@ -14,9 +14,9 @@ tid = page.title_id(season)
 e = data.engine(tid)
 ts = data.titles()
 MN = {"HP": "Hardpoint", "SND": "SnD", "OVL": "Overload", "HJ": "Hijack"}
-RAMP = lambda t: ui.mix("#EEF1EF", ui.BLUE, max(0, min(1, t)))  # noqa: E731
-BEST, WORST = ui.mix(ui.BG, ui.BLUE, 0.55), "#EEF1EF"
-MIDQ, MIDW = ui.mix(ui.BG, ui.STEEL, 0.6), ui.mix("#EEF1EF", ui.BLUE, 0.2)
+RAMP = lambda t: ui.ramp(max(0, min(1, t)))  # noqa: E731
+BEST, WORST = ui.mix(ui.BG, ui.BLUE, 0.55), ui.ramp(0)
+MIDQ, MIDW = ui.mix(ui.BG, ui.STEEL, 0.6), ui.ramp(0.2)
 
 if e.empty:
     ui.html(ui.empty_box(f"No {ts.get(season, {}).get('name', '')} games yet", "Charts appear once series are entered."))
@@ -61,15 +61,18 @@ def dumbbell(rows, lo, hi, ticks, legend_items, name_w=74):
     """rows: [(name, open_v, filled_v, right_text, bold, tip_html)]"""
     sx = lambda v: (max(lo, min(hi, v)) - lo) / (hi - lo) * 100  # noqa: E731
     out = ""
-    for name, a, b, txt, bold, tp in rows:
-        xa, xb = sx(a), sx(b)
+    for ri, (name, a, b, txt, bold, tp) in enumerate(rows):
+        xa, xb = sx(a), sx(b); d = .15 + min(ri, 16) * .06
         out += (f"<div {ui.TAP} style='display:grid; grid-template-columns:{name_w}px minmax(0,1fr) 56px; align-items:center; gap:10px; min-height:34px'>"
                 f"<span style='font-size:14px'>{name}</span><div style='position:relative; height:14px'>"
-                f"<div style='position:absolute; top:6px; left:0; right:0; height:2px; background:{ui.TRACK}'></div>"
-                f"<div style='position:absolute; top:6px; left:{min(xa, xb):.1f}%; width:{abs(xb - xa):.1f}%; height:2px; background:{ui.STEEL}'></div>"
-                f"<div style='position:absolute; top:2px; left:calc({xa:.1f}% - 5px); width:10px; height:10px; border-radius:50%; border:1.5px solid {ui.INK}; background:{ui.BG}; box-sizing:border-box'></div>"
-                f"<div style='position:absolute; top:2px; left:calc({xb:.1f}% - 5px); width:10px; height:10px; border-radius:50%; background:{ui.BLUE}'></div></div>"
-                f"<span style='text-align:right; font-size:14px; font-weight:{600 if bold else 400}'>{txt}</span>{tp}</div>")
+                f"<div style='position:absolute; top:6px; left:0; right:0; height:2px; background:{ui.RULE2}'></div>"
+                f"<div class='{'cb-gx' if xb >= xa else 'cb-gx fromr'}' style='position:absolute; top:6px; left:{min(xa, xb):.1f}%; width:{abs(xb - xa):.1f}%; height:2px; "
+                f"background:{ui.STEEL}; animation-delay:{d + .25:.2f}s'></div>"
+                f"<div class='cb-pop' style='position:absolute; top:2px; left:calc({xa:.1f}% - 5px); width:10px; height:10px; border-radius:50%; border:1.5px solid {ui.INK}; "
+                f"background:{ui.BG}; box-sizing:border-box; animation-delay:{d:.2f}s'></div>"
+                f"<div class='cb-dslide' style='--from:calc({xa:.1f}% - 5px); position:absolute; top:2px; left:calc({xb:.1f}% - 5px); width:10px; height:10px; "
+                f"border-radius:50%; background:{ui.BLUE}; animation-delay:{d + .2:.2f}s'></div></div>"
+                f"<span class='cbn' data-cud='{d:.2f}' style='text-align:right; font-size:14px; font-weight:{600 if bold else 400}'>{txt}</span>{tp}</div>")
     tk = "".join(f"<span>{t}</span>" for t in ticks)
     return (out + f"<div style='display:grid; grid-template-columns:{name_w}px minmax(0,1fr) 56px; gap:10px; margin-top:4px'><span></span>"
             f"<div style='display:flex; justify-content:space-between; font-size:11px; color:{ui.MUTED}'>{tk}</div><span></span></div>"
@@ -116,17 +119,17 @@ if tab == "value":
     with head("Percentile Rankings", "Player"):
         pp = st.selectbox("Player", P, key="vz_pp", label_visibility="collapsed")
     ui.html(RULE)
-    groups = {"Value": [("MAR", st_.mar, lambda v: ui.sg(v, 1)), ("MAR / map", st_.mpm, lambda v: ui.sg(v, 2))],
-              "Slaying": [("K/D", st_.kd, lambda v: f"{v:.2f}"), ("Kills / map", st_.kpm, lambda v: f"{v:.1f}"),
-                          ("Damage / map", st_.dmg, ui.n0), ("Non-traded kills / map", st_.ntk, lambda v: f"{v:.1f}"),
-                          ("Assists / map", st_.apm, lambda v: f"{v:.1f}")],
+    groups = {"Value": [("MAR", st_.mar, lambda v: ui.sg(v, 1)), ("MAR / Map", st_.mpm, lambda v: ui.sg(v, 2))],
+              "Slaying": [("K/D", st_.kd, lambda v: f"{v:.2f}"), ("Kills / Map", st_.kpm, lambda v: f"{v:.1f}"),
+                          ("Damage / Map", st_.dmg, ui.n0), ("Non-Traded Kills / Map", st_.ntk, lambda v: f"{v:.1f}"),
+                          ("Assists / Map", st_.apm, lambda v: f"{v:.1f}")],
               "Objective": []}
     if "hill" in hp:
         groups["Objective"].append(("Hill time / map", hp.hill, ui.mmss))
     if len(snd):
         groups["Objective"].append(("First-blood margin / map", (snd.fb - snd.fd) / snd.n, lambda v: ui.sg(v, 2)))
     if "ovl" in ovl:
-        groups["Objective"].append(("Overloads / map", ovl.ovl / ovl.n, lambda v: f"{v:.2f}"))
+        groups["Objective"].append(("Overloads / Map", ovl.ovl / ovl.n, lambda v: f"{v:.2f}"))
     blocks = ""
     for g, rows in groups.items():
         if not rows:
@@ -135,18 +138,19 @@ if tab == "value":
         for lab, ser, fmt in rows:
             if pp not in ser.dropna().index:
                 continue
+            d = .2 + min(rr.count("cb-pslide"), 14) * .06      # rows ripple in one after another
             pc = int(pctile(ser)[pp]); v = ser[pp]; n = int(ser.notna().sum())
             tp = ui.tip(f"{lab}: {fmt(v)}", "Best in the league" if pc == 100 else "Lowest in the league" if pc == 0 else f"Better than {pc}% of the league",
                         f"{n} players with this stat this season", align="l")
-            col = RAMP(0.35 + pc / 100 * 0.65)
+            col, colfg = ui.readable(RAMP(0.35 + pc / 100 * 0.65))
             rr += (f"<div {ui.TAP} style='display:grid; grid-template-columns:minmax(90px,120px) minmax(60px,1fr) 52px; align-items:center; gap:10px; min-height:38px'>"
                    f"<span style='font-size:14px; line-height:1.25'>{lab}</span><div style='position:relative; height:24px; margin-right:12px'>"
                    f"<div style='position:absolute; top:11px; left:0; right:0; height:3px; background:{ui.TRACK}'></div>"
-                   f"<div style='position:absolute; top:11px; left:0; width:{pc}%; height:3px; background:{col}'></div>"
+                   f"<div class='cb-gx' style='position:absolute; top:11px; left:0; width:{pc}%; height:3px; background:{col}; animation-delay:{d:.2f}s'></div>"
                    f"<div style='position:absolute; top:6px; left:50%; width:1px; height:13px; background:{ui.STEEL}'></div>"
-                   f"<span style='position:absolute; top:0; left:calc({pc}% - 12px); width:24px; height:24px; border-radius:50%; background:{col}; "
-                   f"color:#F2F4F2; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px {ui.BG}'>{pc}</span></div>"
-                   f"<span style='text-align:right; font-size:14px'>{fmt(v)}</span>{tp}</div>")
+                   f"<span class='cbn cb-pslide' data-cud='{d:.2f}' style='animation-delay:{d:.2f}s; position:absolute; top:0; left:calc({pc}% - 12px); width:24px; height:24px; border-radius:50%; background:{col}; "
+                   f"color:{colfg}; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px {ui.BG}'>{pc}</span></div>"
+                   f"<span class='cbn' data-cud='{d:.2f}' style='text-align:right; font-size:14px'>{fmt(v)}</span>{tp}</div>")
         blocks += f"<div>{ui.label(g)}<div style='margin-top:8px'>{rr}</div></div>"
     ui.html(ui.note("Rank among every player this season: 100 is the best in the league, 0 the worst. Hover or tap a row for the number behind it.", 10, 13)
             + f"<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap:20px 32px; margin-top:16px'>{blocks}</div>")
@@ -158,11 +162,11 @@ if tab == "value":
     prev = None
     if tid and tid in order and order.index(tid) > 0:
         prev = order[order.index(tid) - 1]
-    with head("Playstyle", "Compare with"):
+    with head("Playstyle", "Compare With"):
         opts = ["AVG", "GHOST"] + [p for p in P if p != pp]
-        cmp = st.selectbox("Compare with", opts, key="vz_cmp", label_visibility="collapsed",
-                           format_func=lambda o: "League average" if o == "AVG" else
-                           (f"Last season ({ts[prev]['short']})" if prev else "First half of season") if o == "GHOST" else o)
+        cmp = st.selectbox("Compare With", opts, key="vz_cmp", label_visibility="collapsed",
+                           format_func=lambda o: "League Average" if o == "AVG" else
+                           (f"Last Season ({ts[prev]['short']})" if prev else "First Half of the Season") if o == "GHOST" else o)
     ui.html(RULE)
     ghost = cmp == "GHOST"
     if ghost and prev:
@@ -175,8 +179,8 @@ if tab == "value":
         nameA, nameB = f"{pp} · Series {half + 1}–{int(pm.series_no.max())}", f"{pp} · Series 1–{half}"
     else:
         rA = sp.loc[pp]; rB = pd.Series(50, index=AX) if cmp == "AVG" else sp.loc[cmp]
-        nameA, nameB = pp, "League average" if cmp == "AVG" else cmp
-    SPOKEX = ["Kills, K/D and damage combined.", "Hill time (counts double) and overloads.", "First bloods, plants, kills while carrying.",
+        nameA, nameB = pp, "League Average" if cmp == "AVG" else cmp
+    SPOKEX = ["Kills, K/D and damage combined.", "Hill time (counts double) and overloads.", "First Bloods, plants, kills while carrying.",
               "Carrier kills, untraded kills, staying alive.", "How much better on pressure maps than other maps.",
               "Mostly avoiding bad nights (70%), plus good maps (30%)."]
     pt = lambda v, i: "score " + str(v) + " of 100" if i == 5 else "best in the league" if v >= 100 else "lowest in the league" if v <= 0 else f"better than {v}% of the league"  # noqa: E731
@@ -186,10 +190,10 @@ if tab == "value":
     fig.add_scatterpolar(r=[25] * 7, theta=th, mode="lines", fill="toself", fillcolor=ui.BG, line=dict(width=0), hoverinfo="skip")
     if rB is not None:
         bc = ui.STEEL if cmp == "AVG" else ui.INK
-        fig.add_scatterpolar(r=[max(v, 4) for v in list(rB) + [rB.iloc[0]]], theta=th, mode="lines", fill="toself", fillcolor="rgba(33,42,49,0.12)",
+        fig.add_scatterpolar(r=[max(v, 4) for v in list(rB) + [rB.iloc[0]]], theta=th, mode="lines", fill="toself", fillcolor=ui.rgba(ui.INK, 0.12),
                              line=dict(color=bc, width=1.5, dash="dash"), hovertext=[f"{nameB} · {a}: {pt(int(v), i)}" for i, (a, v) in enumerate(zip(AX, rB))] + [""],
                              hoverinfo="text")
-    fig.add_scatterpolar(r=[max(v, 4) for v in list(rA) + [rA.iloc[0]]], theta=th, fill="toself", fillcolor="rgba(18,78,102,0.35)",
+    fig.add_scatterpolar(r=[max(v, 4) for v in list(rA) + [rA.iloc[0]]], theta=th, fill="toself", fillcolor=ui.rgba(ui.BLUE, 0.35),
                          line=dict(color=ui.BLUE, width=2.5), marker=dict(size=7, color=ui.BLUE),
                          hovertext=[f"<b>{a}: {pt(int(v), i)}</b><br>{raw[pp][i] if not ghost else nameA}<br>{SPOKEX[i] if cmp == 'AVG' else nameB + ': ' + (pt(int(rB.iloc[i]), i) if rB is not None else '—')}"
                                     for i, (a, v) in enumerate(zip(AX, rA))] + [""], hoverinfo="text")
@@ -234,7 +238,7 @@ if tab == "value":
                 + ui.legend([(ui.swatch(ui.BLUE, 14, 4), nameA), (ui.swatch(ui.STEEL if cmp == 'AVG' else ui.INK, 14, 2), nameB)]) + gnote)
 
     # ---------------- MAR race
-    ui.html(h2("MAR Race") + ui.note("Running MAR total after each series. Pick up to 3 players to highlight. Hover anywhere on the chart to see where everyone stood.", 10, 13))
+    ui.html(h2("MAR Race") + ui.note("Running MAR total after each series. Pick up to 3 players to highlight. Hover anywhere on the chart to see where everyone stood.", 10, 13) + "<div style='height:12px'></div>")
     st.session_state.setdefault("vz_race_keep", P[:3])
 
     def _race():
@@ -301,18 +305,18 @@ elif tab == "slaying":
     top = max(10, int(np.ceil(d.kills.max() / 10) * 10)) if len(d) else 10
     X = lambda v: f"{v / top * 100:.1f}%"  # noqa: E731
     rows = ""
-    for p in med.index:
-        x = d[d.player == p].kills
+    for bi, p in enumerate(med.index):
+        x = d[d.player == p].kills; dl = .15 + min(bi, 16) * .06
         q1, q2, q3 = x.quantile(.25), x.median(), x.quantile(.75)
-        dots = "".join(f"<span style='position:absolute; top:9px; left:calc({X(v)} - 2px); width:4px; height:4px; border-radius:50%; background:{ui.SLATE}'></span>" for v in x)
+        dots = "".join(f"<span class='cb-fadein' style='animation-delay:{dl + .35:.2f}s; position:absolute; top:9px; left:calc({X(v)} - 2px); width:4px; height:4px; border-radius:50%; background:{ui.SLATE}'></span>" for v in x)
         tp = ui.tip(f"{p} · {MN[spm]} · {len(x)} maps", f"Typical night: {q1:g}–{q3:g} kills (median {q2:g})",
                     f"Worst {x.min():.0f} · best {x.max():.0f} · average {x.mean():.1f}" + (" · small sample" if len(x) < 5 else ""), align="l")
         rows += (f"<div {ui.TAP} style='display:grid; grid-template-columns:74px minmax(0,1fr) 70px; align-items:center; gap:12px; min-height:34px'>"
                  f"<span style='font-size:14px'>{p}</span><div style='position:relative; height:22px'>"
-                 f"<div style='position:absolute; top:10px; left:{X(x.min())}; width:calc({X(x.max())} - {X(x.min())}); height:1px; background:{ui.SLATE}'></div>"
-                 f"<div style='position:absolute; top:3px; left:{X(q1)}; width:calc({X(q3)} - {X(q1)}); min-width:3px; height:16px; background:{ui.mix(ui.BG, ui.STEEL, 0.45)}; "
+                 f"<div class='cb-gxc' style='animation-delay:{dl + .1:.2f}s; position:absolute; top:10px; left:{X(x.min())}; width:calc({X(x.max())} - {X(x.min())}); height:1px; background:{ui.SLATE}'></div>"
+                 f"<div class='cb-gxc' style='animation-delay:{dl:.2f}s; position:absolute; top:3px; left:{X(q1)}; width:calc({X(q3)} - {X(q1)}); min-width:3px; height:16px; background:{ui.mix(ui.BG, ui.STEEL, 0.45)}; "
                  f"border:1px solid {ui.SLATE}; box-sizing:border-box'></div>"
-                 f"<div style='position:absolute; top:1px; left:calc({X(q2)} - 1px); width:2px; height:20px; background:{ui.BLUE}'></div>{dots}</div>"
+                 f"<div class='cb-fadein' style='animation-delay:{dl + .35:.2f}s; position:absolute; top:1px; left:calc({X(q2)} - 1px); width:2px; height:20px; background:{ui.BLUE}'></div>{dots}</div>"
                  f"<span style='text-align:right; font-size:14px'>{q2:g} <span style='font-size:11px; color:{ui.MUTED}'>med</span></span>{tp}</div>")
     ticks = "".join(f"<span>{round(top * f)}</span>" for f in (0, .25, .5, .75, 1))
     ui.html(ui.note("Each dot is one map. The box is a player's typical night (middle half of their maps), the line inside is the median, and the whiskers "
@@ -326,7 +330,7 @@ elif tab == "slaying":
     fmodes = [m for m in modes if not fin.empty and m in set(fin["mode"])]
     if fmodes:
         with head("Finishing · Kills vs Damage"):
-            fmo = st.segmented_control("Finishing mode", fmodes, default=fmodes[0], format_func=MN.get, key="vz_fmo", label_visibility="collapsed") or fmodes[0]
+            fmo = st.segmented_control("Finishing Mode", fmodes, default=fmodes[0], format_func=MN.get, key="vz_fmo", label_visibility="collapsed") or fmodes[0]
         ui.html(RULE)
         c1, c2 = st.columns([1.1, 1], gap="large")
         fd = fin[fin["mode"] == fmo]
@@ -439,7 +443,7 @@ elif tab == "objective":
     snd = e.standings("SND")
     if "fb" in snd:
         defs.append(("Opening Duels", "Search and Destroy · first bloods vs first deaths per map", snd.assign(x=snd.fb / snd.n, y=snd.fd / snd.n),
-                     "First bloods per map", "First deaths per map", lambda v: f"{v:.2f}", lambda v: f"{v:.2f}", "br",
+                     "First Bloods per map", "First deaths per map", lambda v: f"{v:.2f}", lambda v: f"{v:.2f}", "br",
                      {"tl": "Loses openings", "tr": "Aggressive, trades evenly", "bl": "Passive", "br": "Wins openings"}))
     ovl = e.standings("OVL")
     if "ovl" in ovl:
@@ -479,17 +483,17 @@ elif tab == "form":
             if (p, m) not in g.index:
                 none = m not in played_months
                 tp = ui.tip(f"{p} · {mlabel(m)}", f"No games were played in {mlabel(m)}." if none else f"{p} didn’t play this month.", align=al, below=ri < 2)
-                tds += (f"<td {ui.TAP} style='text-align:center; padding:8px 4px; background:{ui.TRACK}; color:{ui.MUTED}; font-size:12px'>"
+                tds += (f"<td class='cb-tap cb-cellin' tabindex='0' style='animation-delay:{.1 + (ri + ci) * .035:.2f}s; text-align:center; padding:8px 4px; background:{ui.TRACK}; color:{ui.MUTED}; font-size:12px'>"
                         f"{'no games' if none else '—'}{tp}</td>")
                 continue
             v, n = g.loc[(p, m)]
-            t = (v - lo) / max(hi - lo, 0.01); bg = RAMP(t); fg = "#F2F4F2" if t >= 0.55 else ui.INK
+            t = (v - lo) / max(hi - lo, 0.01); bg, fg = ui.shade(t)
             if n < 3:
                 bg = ui.mix(bg, ui.BG, 0.35)
             dl = v - avg[p]; arrow = "↑" if dl > 0.03 else "↓" if dl < -0.03 else "→"
             tp = ui.tip(f"{p} · {mlabel(m)}", f"MAR per map {ui.sg(v, 2)} over {int(n)} maps",
                         f"{'Above' if dl >= 0 else 'Below'} season average by {abs(dl):.2f}" + (f" · small sample ({int(n)} maps)" if n < 5 else ""), align=al, below=ri < 2)
-            tds += (f"<td {ui.TAP} style='text-align:center; padding:8px 4px; background:{bg}; color:{fg}'><span style='display:block; font-size:14px; font-weight:500'>"
+            tds += (f"<td class='cb-tap cb-cellin' tabindex='0' style='animation-delay:{.1 + (ri + ci) * .035:.2f}s; text-align:center; padding:8px 4px; background:{bg}; color:{fg}'><span style='display:block; font-size:14px; font-weight:500'>"
                     f"{arrow} {ui.sg(v, 2)}</span><span style='display:block; font-size:10px; opacity:0.8'>{int(n)} maps</span>{tp}</td>")
         trs += (f"<tr><th style='text-align:left; padding:8px; font-size:14px; font-weight:600'>{p}</th>{tds}"
                 f"<td style='text-align:right; padding:8px; font-size:14px; font-weight:600'>{ui.sg(avg[p], 2)}</td></tr>")
@@ -542,13 +546,13 @@ else:
                     tp = ui.tip(a if own else f"{a} {'with' if same else 'vs'} {b}", msg, align=al, below=ri == 0) if msg else ""
                     tds += f"<td {ui.TAP if msg else ''} style='background:{ui.TRACK}; padding:8px 2px'>{tp}</td>"
                     continue
-                wr = w / n; bg = RAMP((wr - 0.25) / 0.5); fg = "#F2F4F2" if wr >= 0.52 else ui.INK
+                wr = w / n; bg, fg = ui.shade((wr - 0.25) / 0.5)
                 if n < 5:
                     bg = ui.mix(bg, ui.BG, 0.6); fg = ui.INK
                 edge = f"box-shadow:inset 0 0 0 2px {ui.INK};" if own else ""
                 head = f"{a} overall" if own else (f"{a} and {b} as teammates" if same else f"{a} against {b}")
                 tp = ui.tip(head, f"{w}–{n - w} in maps ({round(wr * 100)}%)", "Small sample: under 5 maps" if n < 5 else "", align=al, below=ri == 0)
-                tds += (f"<td {ui.TAP} style='text-align:center; padding:6px 2px; background:{bg}; color:{fg}; {edge}'><span style='display:block; font-size:13px; "
+                tds += (f"<td class='cb-tap cb-cellin' tabindex='0' style='animation-delay:{.1 + (ri + ci) * .035:.2f}s; text-align:center; padding:6px 2px; background:{bg}; color:{fg}; {edge}'><span style='display:block; font-size:13px; "
                         f"font-weight:500'>{round(wr * 100)}%</span><span style='display:block; font-size:10px; opacity:0.8'>{n}</span>{tp}</td>")
             trs += f"<tr><th style='text-align:left; padding:6px 8px; font-size:14px; font-weight:600; white-space:nowrap'>{a}</th>{tds}</tr>"
         return (h2(title) + ui.note(sub, 4, 13) + f"<div style='overflow-x:auto; margin-top:12px'>"

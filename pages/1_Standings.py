@@ -21,16 +21,16 @@ t = e.standings(None if scope == "ALL" else scope)
 
 si = lambda v: ("+" if v > 0 else "−" if v < 0 else "") + f"{abs(int(v))}"  # noqa: E731
 BASE = [("mar", "MAR", "Maps Above Replacement", "Map wins a player added over a fill-in, summed across every map in this view.", ui.sg),
-        ("mpm", "MAR / map", "MAR per Map", "Average map wins added per map played. Fairer for players with fewer maps.", lambda v: ui.sg(v, 2)),
+        ("mpm", "MAR / Map", "MAR per Map", "Average map wins added per map played. Fairer for players with fewer maps.", lambda v: ui.sg(v, 2)),
         ("kd", "K/D", "Kill/Death Ratio", "Total kills divided by total deaths.", lambda v: f"{v:.2f}"),
         ("pm", "+/-", "Plus/Minus", "Total kills minus total deaths.", si),
-        ("kpm", "Kills / map", "Kills per Map", "Average kills per map.", lambda v: f"{v:.1f}"),
-        ("dmg", "Damage / map", "Damage per Map", "Average damage dealt per map.", ui.n0),
+        ("kpm", "Kills / Map", "Kills per Map", "Average kills per map.", lambda v: f"{v:.1f}"),
+        ("dmg", "Damage / Map", "Damage per Map", "Average damage dealt per map.", ui.n0),
         ("wp", "Win %", "Map Win Percentage", "Share of maps won.", ui.pct),
-        ("stk", "Best streak", "Longest Streak", "Highest kill streak in a single map.", lambda v: f"{int(v)}")]
+        ("stk", "Best Streak", "Longest Streak", "Highest kill streak in a single map.", lambda v: f"{int(v)}")]
 EXTRA = {"HP": [("hill", "Hill time", "Hill Time per Map", "Average seconds spent in the hardpoint per map.", ui.mmss),
                 ("obj", "Obj kills", "Objective Kills per Map", "Average kills on or around the hill per map.", lambda v: f"{v:.1f}")],
-         "SND": [("fb", "First bloods", "First Bloods", "Times this player got the first kill of a round.", lambda v: f"{int(v)}"),
+         "SND": [("fb", "First Bloods", "First Bloods", "Times this player got the first kill of a round.", lambda v: f"{int(v)}"),
                  ("fd", "First deaths", "First Deaths", "Times this player died first in a round. Lower is better.", lambda v: f"{int(v)}", True),
                  ("pl", "Plants", "Bomb Plants", "Bombs planted.", lambda v: f"{int(v)}")],
          "OVL": [("ovl", "Overloads", "Overloads", "Overloads scored.", lambda v: f"{int(v)}"),
@@ -60,16 +60,21 @@ for i, (p, r) in enumerate(rows.iterrows()):
     small = ui.small_sample() if r.n < min_maps else ""
     tp = ui.tip(f"{p}: {d[4](v)}", f"{'T' if tied else '#'}{rank} of {len(rows)} · {int(r.n)} maps",
                 "Small sample" if r.n < min_maps else "", align="l")
-    html += (f"<div class='cb-tap cb-row' tabindex='0' style='display:grid; grid-template-columns:44px minmax(0,220px) minmax(0,1fr) 80px; "
-             f"align-items:center; gap:12px; min-height:52px; border-bottom:1px solid {ui.RULE}'>"
+    top = i == 0; last = i == len(rows) - 1
+    html += (f"<div class='cb-tap cb-row cb-lb' tabindex='0' style='display:grid; grid-template-columns:44px minmax(0,220px) minmax(0,1fr) 84px; "
+             f"align-items:center; gap:12px; min-height:{64 if top else 52}px; border-bottom:{'0' if last else '1px solid ' + ui.RULE}'>"
              f"<span style='font-size:13px; color:{ui.MUTED}'>{'T' if tied else '#'}{rank}</span>"
-             f"<span style='font-size:16px; font-weight:600'>{p}{small}</span>"
-             f"<div style='height:4px; background:{ui.TRACK}'><div style='height:4px; width:{max(frac * 100, 1):.1f}%; background:{color}'></div></div>"
-             f"<span style='text-align:right; font-size:16px; font-weight:500; color:{ui.BLUE if i == 0 else ui.INK}'>{d[4](v)}</span>{tp}</div>")
-ui.html("<div style='margin-top:28px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap'>"
-        f"<div role='heading' class='cb-h2' style='margin:0; font-weight:400; font-size:34px; letter-spacing:-0.5px'>{d[2]}</div>"
-        f"<span style='font-size:14px; color:{ui.MUTED}'>· {LONG[scope]}</span></div>" + ui.note(d[3])
-        + f"<div style='border-top:2px solid {ui.INK}; margin-top:18px'>{html}</div>")
+             f"<span class='cb-lbn' style='font-size:{18 if top else 16}px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis'>{p}{small}</span>"
+             f"<div style='height:{6 if top else 4}px'><div class='cb-grow' style='height:100%; width:{max(frac * 100, 1):.1f}%; background:{color}; "
+             f"animation-delay:{min(i, 12) * .05:.2f}s'></div></div>"
+             f"<span class='cbn {'cb-lbtop' if top else ''}' data-cud='{.05 * i:.2f}' style='text-align:right; font-size:{28 if top else 17}px; font-weight:{300 if top else 500}; color:{ui.BLUE if top else ui.INK}; "
+             f"font-variant-numeric:tabular-nums'>{d[4](v)}</span>{tp}</div>")
+ui.html("<div style='margin-top:32px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap'>"
+        f"<div role='heading' class='cb-h2' style='margin:0; font-weight:300; font-size:34px; letter-spacing:-0.5px'>{d[2]}</div>"
+        f"<span style='font-size:14px; color:{ui.MUTED}'>· {LONG[scope]}</span></div>" + ui.note(d[3], 6, 14)
+        + f"<div class='cb-fig' style='margin-top:18px'>{html}</div>"
+        + "<style>@media (max-width: 640px) { .cb-lb { grid-template-columns: 30px minmax(0,104px) minmax(0,1fr) 72px !important; }"
+          " .cb-lbtop { font-size: 22px !important; } .cb-lbn { white-space: normal !important; } }</style>")
 
 # full table
 cols = [("Player", "left"), ("Maps", "right"), ("W-L", "right"), ("MAR", "right"), ("MAR/map", "right"), ("K/D", "right"),
@@ -96,13 +101,14 @@ for p, r in t.sort_values("mar", ascending=False).iterrows():
             cell["bg"], cell["fg"] = ui.shade(fr, faded)
         row.append(cell)
     body.append(row)
-c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+ui.html("<div style='height:28px'></div>")
+c1, c2 = st.columns([3, 1], vertical_alignment="center")
 with c1:
-    ui.html(ui.label(f"Full table · {LONG[scope]}", margin_top=40))
+    ui.html(ui.label(f"Full table · {LONG[scope]}"))
 with c2:
     st.download_button("Download CSV", t.round(3).to_csv().encode(), file_name=f"standings_{season}_{scope}.csv", mime="text/csv",
                        width="stretch")
-ui.html(f"<div style='border-top:2px solid {ui.INK}; margin-top:8px'>" + ui.table(cols, body, min_width=760, cell_pad="11px 8px") + "</div>"
-        + ui.legend([("".join(ui.swatch(c, 14, 12) for c in ["#EEF1EF", "#B5C5C9", "#80A0AB", "#487688", ui.BLUE]), "Lowest → highest"),
-                     (ui.swatch("#B9C6C6"), f"Faded: fewer than {min_maps} maps")])
-        + ui.note("Each column is shaded by where the player ranks in this view: the darker the blue, the better. Lower is better for First deaths.", 6, 12))
+ui.html("<div style='margin-top:4px'>" + ui.table_pc(cols, body, [0, 2, 3, 5], f"stfull_{scope}", min_width=760, cell_pad="9px 8px") + "</div>"
+        + ui.legend([("".join(ui.swatch(c, 14, 12) for c in ui.pal()["ramp"]), "Lowest → highest"),
+                     (ui.swatch(ui.mix(ui.ramp(.5), ui.BG, .65)), f"Faded: fewer than {min_maps} maps")])
+        + ui.note("Each column is shaded by where the player ranks in this view: " + ui.better() + ". Lower is better for First deaths.", 6, 12))

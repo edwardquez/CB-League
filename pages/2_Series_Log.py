@@ -32,11 +32,14 @@ if qp and "sl_open" not in st.session_state:
     st.session_state["sl_open"] = qp
 opened = st.session_state.get("sl_open")
 
-top = st.columns([3, 1, 1], vertical_alignment="center")
+ui.html("<style>@media (max-width: 640px) { .st-key-sl_top [data-testid='stHorizontalBlock'] { flex-flow: row wrap !important; }"
+        " .st-key-sl_top [data-testid='stColumn'] { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }"
+        " .st-key-sl_top [data-testid='stColumn']:first-child { flex: 1 0 100% !important; } }</style>")
+top = st.container(key="sl_top").columns([3, 1, 1], vertical_alignment="center")
 with top[0]:
-    ui.html(f"<p style='margin:0; font-size:14px; color:{ui.MUTED}'>{len(S)} series · {len(M)} maps · newest first. Open any series for its recap.</p>")
+    ui.html(f"<p style='margin:0; font-size:14px; color:{ui.MUTED}'><b class='cbn' style='font-weight:600; color:{ui.INK}'>{len(S)}</b> series · <b class='cbn' style='font-weight:600; color:{ui.INK}'>{len(M)}</b> maps · newest first. Open any series for its recap.</p>")
 with top[1]:
-    st.download_button("Series CSV", S.drop(columns=["private_note"], errors="ignore").to_csv(index=False).encode(), "series.csv", "text/csv", width="stretch")
+    st.download_button("Series CSV", S.drop(columns=["private_note", "veto"], errors="ignore").to_csv(index=False).encode(), "series.csv", "text/csv", width="stretch")
 with top[2]:
     cols = ["series_id", "map_no", "mode", "map", "player", "team", "result", "kills", "deaths", "assists", "damage", "hill_time",
             "first_bloods", "first_deaths", "bombs_planted", "overloads", "carrier_kills", "kills_as_carrier", "mar"]
@@ -68,14 +71,16 @@ for r in S.iloc[::-1].itertuples():
                 f"<span style='font-size:16px; color:{cb}; font-weight:{600 if bw else 400}'>{', '.join(r.team_b)}</span></div>")
     with c2:
         is_open = opened == sid
-        if st.button("Hide recap" if is_open else "Recap", key=f"btn_{sid}", type="primary" if is_open else "secondary", width="stretch"):
+        if st.button("Hide Recap" if is_open else "Recap", key=f"btn_{sid}", type="primary" if is_open else "secondary", width="stretch"):
             st.session_state["sl_open"] = None if is_open else sid
             st.rerun()
-    if opened == sid:
+    if opened == sid and M[M.series_id == sid].empty:   # a series that's open with no maps entered yet
+        ui.html(ui.note("No maps have been entered for this series yet, so there's nothing to recap.", 4, 13) + "<div style='height:12px'></div>")
+    elif opened == sid:
         maps = M[M.series_id == sid].sort_values("map_no")
         lc1, lc2 = st.columns([1, 3], vertical_alignment="center")
         with lc1:
-            if st.button("Copy link", key=f"lnk_{sid}"):
+            if st.button("Copy Link", key=f"lnk_{sid}"):
                 st.query_params["series"] = sid
                 st.session_state[f"show_link_{sid}"] = True
         if st.session_state.get(f"show_link_{sid}"):
@@ -83,18 +88,18 @@ for r in S.iloc[::-1].itertuples():
                 st.code(f"?series={sid}", language=None)
                 ui.html(ui.note("Add this to the end of the app's address to open this recap.", 0, 12))
         if r.public_note:
-            ui.html(f"<p style='margin:6px 0 0; font-size:14px; color:{ui.MUTED}'>Notes: {r.public_note}</p>")
+            ui.html(f"<p style='margin:6px 0 0; font-size:14px; color:{ui.MUTED}'>Notes: <span data-sc>{r.public_note}</span></p>")
         cards = ""
         for mm in maps.itertuples():
             bar = ui.INK if mm.winner == "A" else ui.BLUE
             ln = f" · {ui.mmss(mm.length_sec)}" if mm.length_sec == mm.length_sec and mm.length_sec else ""
-            cards += (f"<div style='background:{ui.PANEL}'>{ui.img_tag(mm.map)}<div style='padding:8px 10px 10px'>"
+            cards += (f"<div class='cb-rise' style='background:{ui.PANEL}'>{ui.img_tag(mm.map)}<div style='padding:8px 10px 10px'>"
                       f"<div style='font-size:11px; color:{ui.MUTED}'>Map {mm.map_no} · {MODE.get(mm.mode, mm.mode)}{ln}</div>"
                       f"<div style='display:flex; justify-content:space-between; align-items:baseline; gap:6px; margin-top:2px'>"
                       f"<span style='font-size:14px; font-weight:600'>{mm.map}</span><span style='font-size:13px'>{mm.score_a}–{mm.score_b}</span></div>"
                       f"<div style='height:4px; background:{bar}; margin-top:8px'></div></div></div>")
         ui.html(ui.label("Map by map", margin_top=10)
-                + f"<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; margin-top:10px'>{cards}</div>"
+                + f"<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, max(150px, calc((100% - 30px) / 4))), 1fr)); gap:10px; margin-top:10px'>{cards}</div>"
                 + ui.legend([(ui.swatch(ui.INK, 18, 4), f"{', '.join(r.team_a)} Won · {r.wins_a} Map{'s' if r.wins_a != 1 else ''}"),
                              (ui.swatch(ui.BLUE, 18, 4), f"{', '.join(r.team_b)} Won · {r.wins_b} Map{'s' if r.wins_b != 1 else ''}")]))
         # series totals per team
@@ -137,7 +142,7 @@ for r in S.iloc[::-1].itertuples():
         ln = f" · {ui.mmss(mm.length_sec)}" if mm.length_sec == mm.length_sec and mm.length_sec else ""
         ui.html(f"<p style='margin:4px 0 0; font-size:14px'>{ {'HP': 'Hardpoint', 'SND': 'Search and Destroy', 'OVL': 'Overload'}.get(mm['mode'], mm['mode'])} on {mm['map']} · "
                 f"{mm.score_a}–{mm.score_b}{ln} · Won by {', '.join(won)}" + (" · partial scoreboard" if mm.get("board") == "partial" else "") + "</p>"
-                + ui.legend([("".join(ui.swatch(c, 14, 12) for c in ["#EEF1EF", "#B5C5C9", "#80A0AB", "#487688", ui.BLUE]), "Lowest → Highest in This Lobby"),
+                + ui.legend([("".join(ui.swatch(c, 14, 12) for c in ui.pal()["ramp"]), "Lowest → Highest in This Lobby"),
                              ("", "Blank (—) Means the Stat Wasn't Recorded")])
                 + ui.table([("Player", "left"), ("K", "right"), ("D", "right"), ("K/D", "right"), ("A", "right"), ("Dmg", "right"),
                             (stat[0], "right"), ("MAR", "right")], body, min_width=560, cell_pad="9px 6px")
