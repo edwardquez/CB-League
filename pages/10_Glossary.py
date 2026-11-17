@@ -244,9 +244,6 @@ groups = [
         T("Pressure map", "", "A map where one team could clinch the series, or one that finished close (Hardpoint by 25 or fewer, SnD 6–5, Overload by 1)."),
         T("Ended early", "Tag", "A series that stopped before either team reached the wins needed for its best-of.",
           "The Scorekeeper records the result when it ends: the leading team by default, or no result if it was tied.")])]
-if "HJ" in (cfg.get("modes") or {}):
-    groups.insert(4, ("hj", "Hijack", [T("Hijack", "HJ", "A new Modern Warfare 4 mode. Its stats and MAR values are set in the season's settings once its scoreboard is known; "
-                                                    "until then it borrows Overload's values and shows a Provisional tag.")]))
 out = ""
 for gid, title, terms in groups:
     body = "".join(f"<div class='cb-term' style='display:grid; grid-template-columns:220px minmax(0,1fr); gap:6px 24px; padding:16px 0; border-bottom:1px solid {ui.RULE}'>"

@@ -678,6 +678,8 @@ def title(text: str) -> str:
             # each piece of a hyphenated word gets its own capital ("Fill-In"); numbers and symbols pass through
             seg.append(re.sub(r"[A-Za-z][A-Za-z'’.]*", word, tok))
             prev = tok
+            if re.search(r"\d", tok) and not re.search(r"[A-Za-z]", tok):   # a number can open a sentence too ("30 for a dunk")
+                start = False
             if (re.search(r"[.!?:·—]$", tok) and tok.lower() not in ("e.g.", "i.e.", "vs.")) or tok in ("·", "—", "–"):
                 start = True
         out.append("".join(seg))

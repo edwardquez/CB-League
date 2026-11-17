@@ -28,13 +28,22 @@ BASE = [("mar", "MAR", "Maps Above Replacement", "Map wins a player added over a
         ("dmg", "Damage / Map", "Damage per Map", "Average damage dealt per map.", ui.n0),
         ("wp", "Win %", "Map Win Percentage", "Share of maps won.", ui.pct),
         ("stk", "Best Streak", "Longest Streak", "Highest kill streak in a single map.", lambda v: f"{int(v)}")]
-EXTRA = {"HP": [("hill", "Hill time", "Hill Time per Map", "Average seconds spent in the hardpoint per map.", ui.mmss),
-                ("obj", "Obj kills", "Objective Kills per Map", "Average kills on or around the hill per map.", lambda v: f"{v:.1f}")],
+EXTRA = {"HP": [("hill", "Hill Time", "Hill Time per Map", "Average seconds spent in the hardpoint per map.", ui.mmss),
+                ("obj", "Obj Kills", "Objective Kills per Map", "Average kills on or around the hill per map.", lambda v: f"{v:.1f}")],
          "SND": [("fb", "First Bloods", "First Bloods", "Times this player got the first kill of a round.", lambda v: f"{int(v)}"),
-                 ("fd", "First deaths", "First Deaths", "Times this player died first in a round. Lower is better.", lambda v: f"{int(v)}", True),
+                 ("fd", "First Deaths", "First Deaths", "Times this player died first in a round. Lower is better.", lambda v: f"{int(v)}", True),
                  ("pl", "Plants", "Bomb Plants", "Bombs planted.", lambda v: f"{int(v)}")],
          "OVL": [("ovl", "Overloads", "Overloads", "Overloads scored.", lambda v: f"{int(v)}"),
-                 ("ck", "Carrier kills", "Carrier Kills", "Kills on the enemy carrier.", lambda v: f"{int(v)}")]}
+                 ("ck", "Carrier Kills", "Carrier Kills", "Kills on the enemy carrier.", lambda v: f"{int(v)}")],
+         "HJ": [("data", "Data / Map", "Data Uploaded per Map", "Average points a player's plants uploaded for their team per map: 30 for a dunk, "
+                 "15 for a remote plant, then up to 30 more while the Spike stays planted.", lambda v: f"{v:.0f}"),
+                ("hjp", "Plants", "Data Spike Plants", "Data Spikes planted at the enemy Comm Station: dunks plus remote plants.", lambda v: f"{int(v)}"),
+                ("dk", "Dunks", "Dunks", "Spikes carried into the enemy Comm Station on foot. Worth 30 points straight away.", lambda v: f"{int(v)}"),
+                ("rp", "Remote Plants", "Remote Plants", "Spikes thrown onto the enemy Comm Station from range. Worth 15 points straight away.",
+                 lambda v: f"{int(v)}"),
+                ("itc", "Interceptions", "Interceptions", "Enemy throws caught or shot out of the air, taking the Spike away mid-pass.",
+                 lambda v: f"{int(v)}"),
+                ("pas", "Passes", "Passes", "Throws of the Data Spike to a teammate.", lambda v: f"{int(v)}")]}
 FIN = [("fin", "Finishing", "Finishing · Kills Above Expected", "Kills per map beyond what the player’s damage usually turns "
         "into. Positive means they finish their fights; negative means teammates often get the kill. A tendency more than a fixed trait.",
         lambda v: ui.sg(v, 2))]
@@ -76,11 +85,13 @@ ui.html("<div style='margin-top:32px; display:flex; align-items:baseline; gap:10
         + "<style>@media (max-width: 640px) { .cb-lb { grid-template-columns: 30px minmax(0,104px) minmax(0,1fr) 72px !important; }"
           " .cb-lbtop { font-size: 22px !important; } .cb-lbn { white-space: normal !important; } }</style>")
 
-# full table
+# full table (Hijack's plants are left out here: they're just dunks plus remote plants, which both have columns;
+# remote plants and interceptions get their short scoreboard names so the table fits)
+TBL = [x for x in EXTRA.get(scope, []) if x[0] != "hjp"]
 cols = [("Player", "left"), ("Maps", "right"), ("W-L", "right"), ("MAR", "right"), ("MAR/map", "right"), ("K/D", "right"),
-        ("+/-", "right"), ("K/map", "right"), ("Dmg/map", "right")] + [(x[1], "right") for x in EXTRA.get(scope, [])]
+        ("+/-", "right"), ("K/map", "right"), ("Dmg/map", "right")] + [({"rp": "Remote", "itc": "Int"}.get(x[0], x[1]), "right") for x in TBL]
 src = [("p", None), ("n", None), ("wl", "wp"), ("mar", "mar"), ("mpm", "mpm"), ("kd", "kd"), ("pm", "pm"), ("kpm", "kpm"), ("dmg", "dmg")] + \
-      [(x[0], x[0]) for x in EXTRA.get(scope, [])]
+      [(x[0], x[0]) for x in TBL]
 fmt = {"mar": ui.sg, "mpm": lambda v: ui.sg(v, 2), "kd": lambda v: f"{v:.2f}", "pm": si, "kpm": lambda v: f"{v:.1f}", "dmg": ui.n0}
 fmt.update({x[0]: x[4] for x in EXTRA.get(scope, [])})
 lows = {x[0] for x in EXTRA.get(scope, []) if len(x) > 5 and x[5]}
@@ -108,7 +119,7 @@ with c1:
 with c2:
     st.download_button("Download CSV", t.round(3).to_csv().encode(), file_name=f"standings_{season}_{scope}.csv", mime="text/csv",
                        width="stretch")
-ui.html("<div style='margin-top:4px'>" + ui.table_pc(cols, body, [0, 2, 3, 5], f"stfull_{scope}", min_width=760, cell_pad="9px 8px") + "</div>"
+ui.html("<div style='margin-top:4px'>" + ui.table_pc(cols, body, [0, 2, 3, 5], f"stfull_{scope}", min_width=860 if scope == "HJ" else 760, cell_pad="9px 8px") + "</div>"
         + ui.legend([("".join(ui.swatch(c, 14, 12) for c in ui.pal()["ramp"]), "Lowest → highest"),
                      (ui.swatch(ui.mix(ui.ramp(.5), ui.BG, .65)), f"Faded: fewer than {min_maps} maps")])
-        + ui.note("Each column is shaded by where the player ranks in this view: " + ui.better() + ". Lower is better for First deaths.", 6, 12))
+        + ui.note("Each column is shaded by where the player ranks in this view: " + ui.better() + ". Lower is better for First Deaths.", 6, 12))

@@ -126,6 +126,14 @@ class Engine:
             t["fb"] = g.first_bloods.sum(); t["fd"] = g.first_deaths.sum(); t["pl"] = g.bombs_planted.sum()
         if mode == "OVL":
             t["ovl"] = g.overloads.sum(); t["ck"] = g.carrier_kills.sum(); t["kac"] = g.kills_as_carrier.sum()
+        if mode == "HJ":
+            # min_count=1: a player whose maps never had these read off the scoreboard shows a dash, not a zero
+            hs = lambda c: g[c].sum(min_count=1) if c in d else pd.Series(dtype=float)  # noqa: E731
+            t["data"] = g.data_uploaded.mean() if "data_uploaded" in d else None
+            t["dk"] = hs("dunks"); t["rp"] = hs("remote_plants"); t["hjp"] = hs("hj_plants")
+            t["itc"] = hs("interceptions"); t["pas"] = hs("passes")
+            # plants: the scoreboard's own count, or dunks plus remote plants where only those were entered
+            t["hjp"] = t["hjp"].fillna(t["dk"].fillna(0) + t["rp"].fillna(0)).where(t[["hjp", "dk", "rp"]].notna().any(axis=1))
         fin = self.finishing_frame()
         if len(fin):
             f = fin if mode in (None, "ALL") else fin[fin["mode"] == mode]
